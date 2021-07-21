@@ -28,8 +28,7 @@ async function main(opt){
         tok.race = TADD.details.race
         tok.type = TADD.details.type.value;                             //Type of NPC (Humanoid, etc)
         
-        
-        tok.spellcasting = await can_cast_spells(token);     //Can cast spells?
+        tok.spellcasting = await can_cast_spells(token);                //Can cast spells?
         if (tok.spellcasting){
             tok.spellcaster_type = TADD.attributes.spellcasting;
         } else {
@@ -94,7 +93,7 @@ async function main(opt){
                 tok.data_to_update[AD+"details.spellLevel"] = new_spelllevel;
                 
                 //Load spells based on template
-                
+                let spells = spells_get(tok);
                 
                 
             }
@@ -201,6 +200,56 @@ async function can_cast_spells(token){
     }
     return spellcasting;
 }
+
+async function item_types_remove(token, tok){
+    let item_types_to_delete = [];
+    if (tok.opt.clear_armor){   item_types_to_delete.push("equipment"); }
+    if (tok.opt.clear_spells){  item_types_to_delete.push("spell"); }
+    if (tok.opt.clear_weapons){ item_types_to_delete.push("weapon"); }
+    for (let i of token.actor.items){
+        if (item_types_to_delete.includes(i.type)){
+            tok.items_to_delete.push(i._id);
+        }
+    }
+    await items_delete(token, tok.items_to_delete)
+}
+
+async function items_add(token, items) {
+    let entities = []
+    for (let i of items){
+        let pack = await game.packs.get(i[0]);
+        let index = await pack.getIndex();
+        let entry = await index.find(e => e.name === i[1]);
+        let entity = await pack.getDocument(entry._id);
+        entities.push(entity.data.toObject());
+    }
+    //console.log(entities);
+    await token.actor.createEmbeddedDocuments("Item", entities);
+}
+
+async function items_delete(token, items){
+    await token.actor.deleteEmbeddedDocuments( "Item", items );
+}
+//token.actor.deleteEmbeddedDocuments("ActiveEffect", [effect.id]);
+
+async function items_equip_all(token){
+    for (let i of token.actor.items){
+        await item_equipped_identified_proficient(token, i)
+    }
+}
+
+async function item_equipped_identified_proficient(token, item){
+    await token.actor.updateEmbeddedDocuments("Item", [{
+        _id:item.id, 
+        data:{
+            equipped: true,
+            identified: true,
+            proficient: true
+        }
+        }]
+    );
+}
+
 function npc_count_get(){
     let npc_count = 0;
     for (let t of canvas.tokens.controlled){
@@ -227,6 +276,66 @@ function party_level_average_get(){
     }
     return parseInt(party_level_total / party_count);
 }
+
+function roll_simple(d){
+    return Math.floor(Math.random() * d) + 1
+}
+function roll_no1_no2(qty, d){
+    let total = 0;
+    for (let i = 0; i < qty; i++){
+        let r = Math.floor(Math.random() * d) + 1
+        if (r < 3){ r = 3; }
+        total = total + r;
+    }
+    return total;
+}
+
+async function spells_get(tok){
+    
+}
+
+async function template_choose(tok){
+    let template = [];
+    let type = tok.opt.template_str;
+
+    //Even if "generic" was chosen, use some sense to figure out what kind of NPC we are dealing with
+    if (type == "generic"){
+        //Figure out if npc can cast spells
+        if (tok.spellcasting){
+            if (tok.spellcaster_type == "wis"){
+                template.class = "cleric";
+            } else {
+                template.class = "wizard";
+            }            
+        } else {
+            template.class = "fighter";
+        }
+    }
+    switch(template.class){
+        case "cleric":
+            template.class = "Cleric";
+            template.attributes = ["con","dex","wis"];
+            template.spell_list = ["Heal","Raise Dead"];
+            break;
+        case "fighter":
+            template.class = "Fighter";
+            template.attributes = ["dex","wis","str"];
+            template.spell_list= [];
+            break;
+        case "wizard":
+            template.class = "Wizard";
+            template.attributes = ["con","dex","int"];
+            template.spell_list = ["Magic Missile","Fireball"];
+            break;
+    }
+    console.log(template);
+    return template;
+}
+
+async function token_update(token, tok){
+    await token.document.update(tok.data_to_update);
+}
+
 async function weapon_melee_get(tok){
     let weapon_m = [];
     weapon_m.push("Dagger");
@@ -292,175 +401,6 @@ async function weapon_range_get(tok){
     }
     return weapon_plus_str;
 }
-
-async function item_types_remove(token, tok){
-    let item_types_to_delete = [];
-    if (tok.opt.clear_armor){   item_types_to_delete.push("equipment"); }
-    if (tok.opt.clear_spells){  item_types_to_delete.push("spell"); }
-    if (tok.opt.clear_weapons){ item_types_to_delete.push("weapon"); }
-    for (let i of token.actor.items){
-        if (item_types_to_delete.includes(i.type)){
-            tok.items_to_delete.push(i._id);
-        }
-    }
-    await items_delete(token, tok.items_to_delete)
-}
-
-async function items_add(token, items) {
-    let entities = []
-    for (let i of items){
-        let pack = await game.packs.get(i[0]);
-        let index = await pack.getIndex();
-        let entry = await index.find(e => e.name === i[1]);
-        let entity = await pack.getDocument(entry._id);
-        entities.push(entity.data.toObject());
-    }
-    //console.log(entities);
-    await token.actor.createEmbeddedDocuments("Item", entities);
-}
-
-async function items_delete(token, items){
-    await token.actor.deleteEmbeddedDocuments( "Item", items );
-}
-//token.actor.deleteEmbeddedDocuments("ActiveEffect", [effect.id]);
-
-async function items_equip_all(token){
-    for (let i of token.actor.items){
-        await item_equipped_identified_proficient(token, i)
-    }
-}
-
-async function items_queue_for_delete(token, type){
-    console.log("Queuing type: " + type)
-    for (let i of token.actor.items){
-        if (i.type == type){
-            params.items_to_delete.push(i._id);
-        }
-    }
-}
-
-async function items_delete(token, items){
-    await token.actor.deleteEmbeddedDocuments( "Item", items );
-}
-
-async function item_equipped_identified_proficient(token, item){
-    await token.actor.updateEmbeddedDocuments("Item", [{
-        _id:item.id, 
-        data:{
-            equipped: true,
-            identified: true,
-            proficient: true
-        }
-        }]
-    );
-}
-
-async function template_choose(tok){
-    let template = [];
-    let type = tok.opt.template_str;
-
-    //Even if "generic" was chosen, use some sense to figure out what kind of NPC we are dealing with
-    if (type == "generic"){
-        //Figure out if npc can cast spells
-        if (tok.spellcasting){
-            if (tok.spellcaster_type == "wis"){
-                template.class = "cleric";
-            } else {
-                template.class = "wizard";
-            }            
-        } else {
-            template.class = "fighter";
-        }
-    }
-    switch(template.class){
-        case "cleric":
-            template.class = "Cleric";
-            template.attributes = ["con","dex","wis"];
-            template.spell_list = ["Heal","Raise Dead"];
-            break;
-        case "fighter":
-            template.class = "Fighter";
-            template.attributes = ["dex","wis","str"];
-            template.spell_list= [];
-            break;
-        case "wizard":
-            template.class = "Wizard";
-            template.attributes = ["con","dex","int"];
-            template.spell_list = ["Magic Missile","Fireball"];
-            break;
-    }
-    console.log(template);
-    return template;
-}
-
-async function token_update(token, tok){
-    await token.document.update(tok.data_to_update);
-}
-
-async function token_update_old(token, attr, val){
-    let objUpdate = {};  //new Object();
-    objUpdate[attr] = val;
-    await token.document.update(objUpdate);
-    await token.refresh();
-}
-
-//======================== OK above here =========================
-
-async function actor_update(actor, attr, val){
-    let objUpdate = {};  //new Object();
-    objUpdate[attr] = val;
-    await actor.update(objUpdate);
-}
-async function armor_weapons_remove(token){
-    let ids = [];
-    for (let i of token.actor.items){
-        //console.log("Processing item: " + i.name + "   type: " + i.type)
-        if (i.type == "equipment" || i.type == "weapon"){
-            //console.log("   Deleting item: " + i.name)
-            ids.push(i._id);
-        }
-    }
-    params.items_to_delete = ids;
-    await items_delete(token, ids);
-}
-async function item_delete(token, item){
-    await token.actor.deleteEmbeddedDocuments( "Item", [ item.id ] );
-}
-async function item_add(token, compendium, item_name) {
-    let pack = await game.packs.get(compendium);
-    let index = await pack.getIndex();
-    let entry = await index.find(e => e.name === item_name);
-    let entity = await pack.getDocument(entry._id);
-    console.log(entity)
-    await token.actor.createEmbeddedDocuments("Item", [entity.data.toObject()]);
-}
-function roll_simple(d){
-    return Math.floor(Math.random() * d) + 1
-}
-function roll_no1_no2(qty, d){
-    let total = 0;
-    for (let i = 0; i < qty; i++){
-        let r = Math.floor(Math.random() * d) + 1
-        if (r < 3){ r = 3; }
-        total = total + r;
-    }
-    return total;
-}
-
-
-
-async function spelllevel_set(token){
-    await token.actor.updateEmbeddedDocuments("Item", [{
-        _id:item.id, 
-        data:{
-            equipped: true,
-            identified: true,
-            proficient: true
-        }
-        }]
-    );
-}
-
 
 //================================== Dialogs ==================================
 function dialog_options(){
