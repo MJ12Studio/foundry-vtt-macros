@@ -15,7 +15,7 @@
             
     Add more randomness to HP
     
-    Last Update: 2021.07.24
+    Last Update: 2021.07.24p
 */
 
 
@@ -32,15 +32,17 @@ async function main(opt){
         let AD   = "actorData.data.";               //Used for WRITING data to token
 
         //Reset some params for each token
-        let tok = [];
-        tok.abilities = [];
+        let tok = [];                               //tok = temp object holding adjustments.
+        tok.abilities = [];                         
         tok.data_to_update = [];
         tok.items_to_add = [];
         tok.items_to_delete = [];
-        tok.opt = opt;
+        tok.items_updates = [];
+        tok.opt = opt;                              //tok.opt = options from HTML dialog form
         
         //CR and adjustment_factor
         tok.cr = TADD.details.cr;
+        if (tok.cr < 1){ tok.cr = 1; }
         tok.cr_orig = TADD.details.cr_orig;
         if (tok.cr_orig){
             console.log("   CR True")
@@ -53,7 +55,6 @@ async function main(opt){
         } else {
             console.log("   CR False")
             tok.cr_orig = tok.cr;
-            if (tok.cr_orig < 1){ tok.cr_orig = 1; }
             tok.data_to_update[AD+"details.cr_orig"] = tok.cr_orig;
             tok.data_to_update[AD+"abilities.cha.orig"] = TADD.abilities.cha.value;
             tok.data_to_update[AD+"abilities.con.orig"] = TADD.abilities.con.value;
@@ -69,9 +70,10 @@ async function main(opt){
             tok.abilities.wis = TADD.abilities.wis.value;
         }
         tok.cr_new = tok.cr + opt.cr_change;
+        if (tok.cr_new < 1){ tok.cr_new = 1; }
         tok.data_to_update[AD+"details.cr"] = tok.cr_new;
         tok.cr_change_since_orig = tok.cr_new - tok.cr_orig;
-        tok.adjust_factor = tok.cr_new / tok.cr;
+        tok.adjust_factor = tok.cr_new / tok.cr_orig;
 
         //Misc Token info
         tok.alignment = TADD.details.alignment;                             //Alignment
@@ -154,6 +156,12 @@ async function main(opt){
                     tok.items_to_add.push(["dnd5e.spells", spell]);
                 }
             }
+            
+            
+    
+            //Social Status
+                //Give them a title?
+
         } else {
             //Non-Humanoids
            
@@ -167,20 +175,64 @@ async function main(opt){
             }
             if (tok.ac_orig){
                 console.log("   True")
-                tok.data_to_update[AD+"attributes.ac.min"] = tok.ac_orig + tok.ac_adjust;
+                tok.data_to_update[AD+"attributes.ac.min"]   = tok.ac_orig + tok.ac_adjust;
                 tok.data_to_update[AD+"attributes.ac.value"] = tok.ac_orig + tok.ac_adjust;
             } else {
                 //Create
                 console.log("   False")
-                tok.data_to_update[AD+"attributes.ac.orig"] = tok.ac;
-                tok.data_to_update[AD+"attributes.ac.min"] = tok.ac + tok.ac_adjust;
+                tok.data_to_update[AD+"attributes.ac.orig"]  = tok.ac;
+                tok.data_to_update[AD+"attributes.ac.min"]   = tok.ac + tok.ac_adjust;
                 tok.data_to_update[AD+"attributes.ac.value"] = tok.ac + tok.ac_adjust;
             }
 
-            //Upgrade size
+            //Scale Damage
+            for (let item of token.actor.items){
+                console.log(item);
+                if (item.type == "weapon"){
+                    let dam = "";
+                    let dam_type = "";
+                    let dam_orig = item.data.data.damage.orig_dam;
+                    if (dam_orig){
+                        dam = "(" + dam_orig + ") * " + tok.adjust_factor;
+                        dam_type = item.data.data.damage.orig_type;
+                    } else {
+                        dam = item.data.data.damage.parts[0][0];
+                        dam_orig = dam;
+                        dam = "(" + dam + ") * " + tok.adjust_factor;
+                        dam_type = item.data.data.damage.parts[0][1];
+                        
+                        tok.items_updates.push({
+                            _id:item.id, 
+                            data:{
+                                damage:{
+                                    orig_dam: dam_orig,
+                                    orig_type: dam_type
+                                }
+                            }
+                        });
+                    }
+                    tok.items_updates.push({
+                        _id:item.id, 
+                        data:{
+                            damage:{
+                                parts: [[dam, dam_type]]
+                            }
+                        }
+                    });
+                }
+            }
             
-            //Add features
+            console.log(tok.items_updates);
+            await items_update(token, tok);
+            
+            
+            
+            
 
+            //Upgrade size
+
+            //Add features
+                //Always add multi-Attack
         }
 
         //Do all updates that need done
@@ -214,9 +266,7 @@ async function main(opt){
         
         
         
-        //Give them a title?
-    
-        //Social Status
+        
 
         // Do they have a shield?
 
@@ -286,16 +336,18 @@ async function can_cast_spells(token){
 }
 
 async function item_types_remove(token, tok){
-    let item_types_to_delete = [];
-    if (tok.opt.clear_armor){   item_types_to_delete.push("equipment"); }
-    if (tok.opt.clear_spells){  item_types_to_delete.push("spell"); }
-    if (tok.opt.clear_weapons){ item_types_to_delete.push("weapon"); }
-    for (let i of token.actor.items){
-        if (item_types_to_delete.includes(i.type)){
-            tok.items_to_delete.push(i._id);
+    if (tok.type == "humanoid"){
+        let item_types_to_delete = [];
+        if (tok.opt.clear_armor){   item_types_to_delete.push("equipment"); }
+        if (tok.opt.clear_spells){  item_types_to_delete.push("spell"); }
+        if (tok.opt.clear_weapons){ item_types_to_delete.push("weapon"); }
+        for (let i of token.actor.items){
+            if (item_types_to_delete.includes(i.type)){
+                tok.items_to_delete.push(i._id);
+            }
         }
+        await items_delete(token, tok.items_to_delete)
     }
-    await items_delete(token, tok.items_to_delete)
 }
 
 async function items_add(token, items) {
@@ -337,6 +389,10 @@ async function item_equipped_identified_proficient(token, item){
         }
         }]
     );
+}
+
+async function items_update(token, tok){
+    await token.actor.updateEmbeddedDocuments("Item", tok.items_updates);
 }
 
 function npc_count_get(){
@@ -574,6 +630,11 @@ function dialog_options(){
                 <div class="form-group">
                     <label>Adjust NPC CR:</label>
                     <select id="scale-npc-cr" name="scale-npc-cr">
+                        <option value="-10">-10</option>
+                        <option value="-9">-9</option>
+                        <option value="-8">-8</option>
+                        <option value="-7">-7</option>
+                        <option value="-6">-6</option>
                         <option value="-5">-5</option>
                         <option value="-4">-4</option>
                         <option value="-3">-3</option>
