@@ -1,4 +1,17 @@
 /*
+    Questions:
+        * Which NPCs get multi-attacks, how many attacks, at what CR
+        
+        * Armor
+            Need a better way to hand out armor
+            When to add a shield
+              
+        * 
+          
+
+
+
+
     Items (Magic Items)
     Loot
     
@@ -56,18 +69,18 @@ async function main(opt){
         tok.max_spell_level = spell_level_get_max(tok.cr_new);
 
         //Misc Token info
-        tok.alignment = TADD.details.alignment;                             //Alignment
+        tok.alignment = TADD.details.alignment;                       //Alignment
         tok.race = TADD.details.race
-        tok.type = is_humanoid(TADD.details.type.value);                                 //Type of NPC (Humanoid, etc)
+        tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)
 
-        //Use Templates for as much as we can! ====================================================================
-        let pack = await game.packs.get(tok.opt.template)                   //Read template based on Dialog Option
+        //Use Templates for as much as we can!
+        let pack = await game.packs.get(tok.opt.template)             //Read template based on Dialog Option
         console.log(pack);
-        let all_compendium_items = await pack.getContent();                 //Get all template content (items)
-        console.log(all_pack_items);
+        let template_items = await pack.getContent();                 //Get all template content (items)
+        console.log(template_items);
 
         //Loop through all template compendium items
-        for (let item of all_compendium_items){
+        for (let item of template_items){
             if (item.name.indexOf("Scale NPC Ability")>-1 && tok.opt.adjust_abilities){ tok.items_to_add.push([item.pack, item.name]); }
             if (item.name === "Scale NPC AC" && tok.opt.adjust_ac){ tok.items_to_add.push([item.pack, item.name]); }
             if (item.name === "Scale NPC HP" && tok.opt.adjust_hp){ tok.items_to_add.push([item.pack, item.name]); }
@@ -120,193 +133,44 @@ async function main(opt){
                     }
                 });
             }
-        }
-        console.log(tok.items_updates);
-        await items_update(token, tok);
-        
-        
-        
-        
-
-
-        
-        //Do all updates that need done
-        await item_types_remove(token, tok);                //Remove all selected item types
-        await items_add(token, tok.items_to_add);           //Add all items
-        await items_equip_all(token);                       //Equip, identify, make proficient all items
-        await token.document.update(tok.data_to_update);    //Update all token data at once!
-        await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
-
-        console.log(tok);
-        console.log(token);
-        console.log(token.actor.data.data);
-        
-        
-        continue;           //============= Temporary End Point
-        
-        
-
-        //await pack.getIndex();
-        //for (let l=1; l<=tok.max_spell_level; l++){
-            //let spells = await pack.index.filter(e => e.type === "spell" );
-            //console.log(spells);
-        //}
-
-        //let spells1 = await pack.getContent().filter(e => e.type === "spell");
-        //console.log(spells1);
-
-
-        //tok.spellcasting = await can_cast_spells(token);                    //Can cast spells?
-        //if (tok.spellcasting){
-        //    tok.items_to_add.push(["world.mj-npc-features", "Scale NPC Spellslots"]);
-        //} else {
-        //    tok.spellcaster_type = false;
-        //}
-        
-        
-        
-        
-        
-        
-        
-        
-
-        
-        
-        
-        
-        
-        
-        
-
-
-
-        //Is npc a humanoid
-        if (tok.type == "humanoid"){
-            //Armor
-            if (opt.adjust_armor){
-                let armor_plus_str = await armor_get(tok);
-                tok.items_to_add.push(["dnd5e.items", armor_plus_str])    
-            }
-
-            //Weapons
-            if (opt.adjust_weapons){
-                let weapon_melee_str = await weapon_melee_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_melee_str]);
-                let weapon_range_str = await weapon_range_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_range_str]);
-            }
-            
-            
-    
-            //Social Status
-                //Give them a title?
-
-        } else {
-            //Non-Humanoids
-           
-            //Adjust AC
-            tok.ac_orig = TADD.attributes.ac.orig;
-            tok.ac = TADD.attributes.ac.value;
-            if (tok.cr_new > 0){
-                tok.ac_adjust = parseInt((tok.cr_new - tok.cr_orig)/2);
-            } else {
-                tok.ac_adjust = 0
-            }
-            if (tok.ac_orig){
-                console.log("   True")
-                tok.data_to_update[AD+"attributes.ac.min"]   = tok.ac_orig + tok.ac_adjust;
-                tok.data_to_update[AD+"attributes.ac.value"] = tok.ac_orig + tok.ac_adjust;
-            } else {
-                //Create
-                console.log("   False")
-                tok.data_to_update[AD+"attributes.ac.orig"]  = tok.ac;
-                tok.data_to_update[AD+"attributes.ac.min"]   = tok.ac + tok.ac_adjust;
-                tok.data_to_update[AD+"attributes.ac.value"] = tok.ac + tok.ac_adjust;
-            }
-
-            //Scale Damage
-            for (let item of token.actor.items){
-                console.log(item);
-                if (item.type == "weapon"){
-                    let dam = "";
-                    let dam_type = "";
-                    let dam_orig = item.data.data.damage.orig_dam;
-                    if (dam_orig){
-                        dam = "(" + dam_orig + ") * " + tok.adjust_factor;
-                        dam_type = item.data.data.damage.orig_type;
-                    } else {
-                        dam = item.data.data.damage.parts[0][0];
-                        dam_orig = dam;
-                        dam = "(" + dam + ") * " + tok.adjust_factor;
-                        dam_type = item.data.data.damage.parts[0][1];
-                        
-                        tok.items_updates.push({
-                            _id:item.id, 
-                            data:{
-                                damage:{
-                                    orig_dam: dam_orig,
-                                    orig_type: dam_type
-                                }
-                            }
-                        });
-                    }
-                    tok.items_updates.push({
-                        _id:item.id, 
-                        data:{
-                            damage:{
-                                parts: [[dam, dam_type]]
-                            }
-                        }
-                    });
-                }
-            }
-            
             console.log(tok.items_updates);
             await items_update(token, tok);
-            
-            
-            
-            
-
-            //Upgrade size
-
+        }
+        
+        //Update token if humanoid, non-humanoid, both
+        if (!tok.is_humanoid){
+            //Upgrade size?
             //Add features
                 //Always add multi-Attack
+        } else {
+        
+            
         }
+        
+        
+        
 
-        //Do all updates that need done
+        //Do all updates that need done to this token
         await item_types_remove(token, tok);                //Remove all selected item types
         await items_add(token, tok.items_to_add);           //Add all items
-        //console.log("After add")
-        
         await items_equip_all(token);                       //Equip, identify, make proficient all items
-        console.log("After equip")
-        
         await token.document.update(tok.data_to_update);    //Update all token data at once!
-        console.log("After update")
-        
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
-        console.log("After long rest")
 
         console.log(tok);
         console.log(token);
         console.log(token.actor.data.data);
+        
+        
+    }
+    console.log("Finished processing tokens...");
 
-        //Cleanup token health bars
+}
 
-        //What race is NPC
-        //  token.data.data.details.race
+            
 
-        //----------------------------------------------------------------------------------
+            
 
-        
-        
-        //----------------------------------------------------------------------------------
-        
-        
-        
-        
 
         // Do they have a shield?
 
@@ -326,10 +190,7 @@ async function main(opt){
 
 
         //Adjust Age
-    }
-    console.log("Finished processing tokens...");
 
-}
 
 /*=================================================================
     Functions
