@@ -1,15 +1,110 @@
 /*
+    ===============================================================================================
+    Public Release notes
+    ===============================================================================================
+    1. Macro only for 1st release
+    
+    2. Must-Have features for public-release:
+        Up CR
+        Up HP
+        Up Abilities
+        * Loot
+            * GP, PP, SP, CP, Gems -- Come up with a way to add these objects from pure code, not compendiums
+            
+        * Misc Magic Items
+        
+        *Features
+            Auras:
+                "Dark Aura","Death Burst","Fear Aura","Fetid Cloud","Fire Aura"
+            
+            Attacks:
+                Low-Level:  "Acid Spray","Aggressive","Brave","Charge","Cunning Action","Dreadful Glare","Enlarge","Fling","Frost Breath","Heated Body"
+            
+                Medium-level: "Assassinate","Blinding Breath","Blood Frenzy","Deadly Leap","Disrupt Life","Firat Roar","Frightening Gaze","Haste","Healing Touch"
+            
+                High-Damage: "Acid Breath","Channel Negative Energy","Cold Breath","Death Throes","Ethereal Jaunt","Fire Breath","Frightful Presence"
+            
+            *Defense/Immunities:
+                "Acid Absorption","Dark Devotion","Evasion","Fire Absorption","Heal Self","Horrific Appearance"
+                
+                
+            
+            * Senses/Skills
+                "Amphibious","Devil Sight", "Ethereal Sight","Freedom of Movement","Hold Breath"
+
+
+        For Humanoid NPC
+            *Social Class
+                Pick From a Bell curve distribution
+                Dirt Poor       0.1%    0.25    [Unskilled people,laborers,soldiers]
+                Poor            2%      0.50    [Unskilled people,laborers,soldiers]
+                Below Average   14%     0.75    [Unskilled people,laborers,soldiers]
+                Average         68%     1.00    [People with Skills,soldiers]
+                Above Average   14%     1.50    [Knights,Captains,Lieutenants]
+                Nobility        2%      2.00    [Lords,Generals]
+                Royalty         0.1%    4.00    [Dukes,Princes,Kings]
+                
+            *Armor
+                *Change routine to upgrade current armor.
+                *Read for compendiums
+
+            Spells
+            *Weapons
+                *Change routine to upgrade current weapon(s).
+                *Read for compendiums
+                
+            * Multi-attacks (Fighters get theirs at level 3)
+                *Add or Upgrade
+                If humanoid AND a fighter-template then:
+                    * At 3 = 2 attacks
+                    * At 12 = 3 attacks
+                Spellcasters get no multi-attacks
+            * Do we add a hierarchy
+        
+        For Non-Humanoid NPC
+            * Multi-attacks
+                *Add or Upgrade
+                
+            * Scale damage
+            
+            *** Don't mess with their multi-attacks and their weapons
+                * Scale damage is OK, but don't clear them and try to add new ones
+            
+            Intelligent
+                
+            
+            Non-Intelligent        
+    
+    
+    
+    ===============================================================================================
+
     Questions:
         * Which NPCs get multi-attacks, how many attacks, at what CR
         
         * Armor
             Need a better way to hand out armor
             When to add a shield
-              
-        * 
-          
 
 
+
+
+
+    ===============================
+    Wish List
+    ===============================
+    * Can we create an item on the fly without a compendium
+    
+    * DAE Item that heals when certain damage would be taken
+    
+    ?? Check out "Cast a Spell" monster feature
+      
+    Features based on Monster type (Undead, beast, celestial)
+
+    Scale CR > 20
+    
+    Which Non-Humanoids can wear armor, use weapons?
+        Make lookup tables for this.
 
 
     Items (Magic Items)
@@ -210,6 +305,19 @@ async function armor_get(tok){
     armor.push("Chain Mail");               // 16 11
     armor.push("Splint Armor");             // 17 12
     armor.push("Plate Armor");              // 18 13
+    
+    CR * (100-500) * (social_level)(0-4)
+    
+    12000 
+    
+    2000 Plate
+    +3 1000
+    
+    100
+    2900 +2
+    
+    
+    
     let armor_number = 0;
     if (tok.cr_new > 0 && tok.cr_new < 5){ armor_number = roll_simple(4); }
     if (tok.cr_new > 4 && tok.cr_new < 9){ armor_number = roll_simple(4) + 4; }
