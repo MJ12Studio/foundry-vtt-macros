@@ -10,6 +10,7 @@
         Up Abilities
         * Loot
             * GP, PP, SP, CP, Gems -- Come up with a way to add these objects from pure code, not compendiums
+            * Add a button to just generate loot
             
         * Misc Magic Items
         
@@ -94,17 +95,15 @@
     Wish List
     ===============================
     * Can we create an item on the fly without a compendium
-    
     * DAE Item that heals when certain damage would be taken
-    
     ?? Check out "Cast a Spell" monster feature
-      
     Features based on Monster type (Undead, beast, celestial)
-
     Scale CR > 20
-    
     Which Non-Humanoids can wear armor, use weapons?
         Make lookup tables for this.
+    * Come up with various ways to distribute loot
+
+
 
 
     Items (Magic Items)
@@ -126,7 +125,6 @@
     Last Update: 2021.07.28a
 */
 
-
 dialog_options();
 
 async function main(opt){
@@ -141,41 +139,111 @@ async function main(opt){
 
         //Reset some params for each token
         let tok = [];                               //tok = temp object holding adjustments.
-        tok.abilities = [];                         
+        tok.abilities = [];
         tok.data_to_update = [];
         tok.items_to_add = [];
         tok.items_to_delete = [];
         tok.items_updates = [];
+        tok.movement = [];
         tok.opt = opt;                              //tok.opt = options from HTML dialog form
-        
+        tok.originals = [];
+
         //CR and adjustment_factor
         tok.cr = TADD.details.cr;
         if (tok.cr < 1){ tok.cr = 1; }
-        tok.cr_orig = TADD.details.cr_orig;
-        if (!tok.cr_orig){
-            tok.cr_orig = tok.cr;
-            tok.data_to_update[AD+"details.cr_orig"] = tok.cr_orig;
+        tok.originals.cr = TADD.originals?.cr;
+        if (!tok.originals.cr){
+            tok.originals.cr = tok.cr;
+            tok.data_to_update[AD+"originals.cr"] =     tok.originals.cr;
+            tok.data_to_update[AD+"originals.cha"] =    TADD.abilities.cha.value;
+            tok.data_to_update[AD+"originals.con"] =    TADD.abilities.con.value;
+            tok.data_to_update[AD+"originals.dex"] =    TADD.abilities.dex.value;
+            tok.data_to_update[AD+"originals.int"] =    TADD.abilities.int.value;
+            tok.data_to_update[AD+"originals.str"] =    TADD.abilities.str.value;
+            tok.data_to_update[AD+"originals.wis"] =    TADD.abilities.wis.value;
+            tok.data_to_update[AD+"originals.burrow"] = TADD.attributes.movement.burrow;
+            tok.data_to_update[AD+"originals.climb"] =  TADD.attributes.movement.climb;
+            tok.data_to_update[AD+"originals.fly"] =    TADD.attributes.movement.fly;
+            tok.data_to_update[AD+"originals.swim"] =   TADD.attributes.movement.swim;
+            tok.data_to_update[AD+"originals.walk"] =   TADD.attributes.movement.walk;
+
+            tok.abilities.cha = TADD.abilities.cha.value;
+            tok.abilities.con = TADD.abilities.con.value;
+            tok.abilities.dex = TADD.abilities.dex.value;
+            tok.abilities.int = TADD.abilities.int.value;
+            tok.abilities.str = TADD.abilities.str.value;
+            tok.abilities.wis = TADD.abilities.wis.value;
+            
+            tok.movement.burrow = TADD.attributes.movement.burrow;
+            tok.movement.climb =  TADD.attributes.movement.climb;
+            tok.movement.fly=     TADD.attributes.movement.fly;
+            tok.movement.swim =   TADD.attributes.movement.swim;
+            tok.movement.walk =   TADD.attributes.movement.walk;
+        } else {
+            tok.abilities.cha = TADD.originals.cha;
+            tok.abilities.con = TADD.originals.con;
+            tok.abilities.dex = TADD.originals.dex;
+            tok.abilities.int = TADD.originals.int;
+            tok.abilities.str = TADD.originals.str;
+            tok.abilities.wis = TADD.originals.wis;
+            
+            tok.movement.burrow = TADD.originals.burrow;
+            tok.movement.climb =  TADD.originals.climb;
+            tok.movement.fly=     TADD.originals.fly;
+            tok.movement.swim =   TADD.originals.swim;
+            tok.movement.walk =   TADD.originals.walk;
         }
         tok.cr_new = tok.cr + opt.cr_change;
         if (tok.cr_new < 1){ tok.cr_new = 1; }
         tok.data_to_update[AD+"details.cr"] = tok.cr_new;
-        tok.cr_change_since_orig = tok.cr_new - tok.cr_orig;
-        tok.adjust_factor = tok.cr_new / tok.cr_orig;
+        tok.cr_change_since_orig = tok.cr_new - tok.originals.cr;
+        tok.adjust_factor = tok.cr_new / tok.originals.cr;
         tok.max_spell_level = spell_level_get_max(tok.cr_new);
 
         //Misc Token info
         tok.alignment = TADD.details.alignment;                       //Alignment
         tok.race = TADD.details.race
         tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)
+        tok.xp = xp_get(tok.cr_new);
 
-        //Use Templates for as much as we can!
-        let pack = await game.packs.get(tok.opt.template)             //Read template based on Dialog Option
-        console.log(pack);
-        let template_items = await pack.getContent();                 //Get all template content (items)
-        console.log(template_items);
+        //Read in template
+        tok.template = await template_choose(tok);
+        
+        console.log(tok);
+        console.log(token);
 
-        //Loop through all template compendium items
-        for (let item of template_items){
+        //Adjust Abilities
+        if (tok.opt.adjust_abilities){
+            for (let ability of tok.template.abilities){
+                console.log("ability to upgrade: " + ability);
+                console.log("   amount to add: " + Math.ceil(tok.cr_new/3));
+                tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.ceil(tok.cr_change_since_orig/3)
+            }
+        }
+
+        //Adjust HP
+        if (opt.adjust_hp){
+            let hp = TADD.attributes.hp.max;
+            tok.hp = parseInt(tok.cr_new * 12) + (Math.ceil((tok.abilities.con - 10) / 2) * tok.cr_new);
+            tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
+        }
+
+        //Adjust Movement: Adjust up or down by 1 foot per CR 
+        if (opt.adjust_movement){
+            for (let m of ["burrow","climb","fly","swim","walk"]){
+                let cur_m = TADD.attributes.movement[m];
+                if (cur_m > 0){
+                    tok["movement_" + m] = parseInt(cur_m + opt.npc_cr);
+                    tok.data_to_update[AD+"attributes.hp.movement." + m] = tok["movement_" + m];
+                }
+            }
+        }
+        
+        
+      
+        /*
+        //Loop through all token items
+        for (let item of token.actor.items){
             if (item.name.indexOf("Scale NPC Ability")>-1 && tok.opt.adjust_abilities){ tok.items_to_add.push([item.pack, item.name]); }
             if (item.name === "Scale NPC AC" && tok.opt.adjust_ac){ tok.items_to_add.push([item.pack, item.name]); }
             if (item.name === "Scale NPC HP" && tok.opt.adjust_hp){ tok.items_to_add.push([item.pack, item.name]); }
@@ -185,16 +253,7 @@ async function main(opt){
                     tok.items_to_add.push([item.pack, item.name]);
                 }
             }
-            if (item.name === "Flag - Armor" && opt.adjust_armor){
-                let armor_plus_str = await armor_get(tok);
-                tok.items_to_add.push(["dnd5e.items", armor_plus_str])
-            }
-            if (item.name === "Flag - Weapons" && opt.adjust_weapons){
-                let weapon_melee_str = await weapon_melee_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_melee_str]);
-                let weapon_range_str = await weapon_range_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_range_str]);
-            }
+            
             
             if (item.name === "weapon" && !tok.is_humanoid){
                 let dam = "";
@@ -230,18 +289,33 @@ async function main(opt){
             }
             console.log(tok.items_updates);
             await items_update(token, tok);
+            
         }
         
         //Update token if humanoid, non-humanoid, both
         if (!tok.is_humanoid){
-            //Upgrade size?
-            //Add features
-                //Always add multi-Attack
+            //Get a social_status
+            tok.social_status = roll_bell_curve_1000();
+            tok.luck = roll_bell_curve_1000();
+            tok.base_gp = experience_points_get(tok.cr_new);
+            tok.gp = tok.social_status * tok.luck * tok.xp;
+
+            if (opt.adjust_armor){
+                let armor_plus_str = await armor_get(tok);
+                tok.items_to_add.push(["dnd5e.items", armor_plus_str])
+            }
+            if (opt.adjust_weapons){
+                let weapon_melee_str = await weapon_melee_get(tok);
+                tok.items_to_add.push(["dnd5e.items", weapon_melee_str]);
+                let weapon_range_str = await weapon_range_get(tok);
+                tok.items_to_add.push(["dnd5e.items", weapon_range_str]);
+            }
+
         } else {
         
             
         }
-        
+        */
         
         
 
@@ -306,6 +380,7 @@ async function armor_get(tok){
     armor.push("Splint Armor");             // 17 12
     armor.push("Plate Armor");              // 18 13
     
+    /*
     CR * (100-500) * (social_level)(0-4)
     
     12000 
@@ -315,7 +390,7 @@ async function armor_get(tok){
     
     100
     2900 +2
-    
+    */
     
     
     let armor_number = 0;
@@ -438,6 +513,19 @@ function party_level_average_get(){
     return parseInt(party_level_total / party_count);
 }
 
+function roll_bell_curve_1000(){
+    let roll = roll_simple(1000);
+    switch(true){
+        case (roll<5):   return 0.25; //1-4         4/1000   =  0.4%
+        case (roll<21):  return 0.50; //5-20        16/1000  =  1.6%
+        case (roll<161): return 0.75; //21-160      140/1000 = 14.0%
+        case (roll<841): return 1.00; //161-840     680/1000 = 68.0%
+        case (roll<981): return 1.50; //861-980     140/1000 = 14.0%
+        case (roll<997): return 2.00; //981-996     16/1000  =  1.6%
+        default:         return 4.00; //997-1000    4/1000   =  0.4%
+    }
+}
+
 function roll_simple(d){
     return Math.floor(Math.random() * d) + 1
 }
@@ -535,7 +623,7 @@ async function template_choose(tok){
     switch(template.class){
         case "cleric":
             template.class = "Cleric";
-            template.attributes = ["con","dex","wis"];
+            template.abilities = ["con","dex","wis"];
             template.spell_list = [
                 ["Light"],
                 ["Cure Wounds","Healing Word","Inflict Wounds","Protection from Evil and Good","Sanctuary","Shield of Faith"],
@@ -551,17 +639,17 @@ async function template_choose(tok){
             break;
         case "fighter":
             template.class = "Fighter";
-            template.attributes = ["dex","wis","str"];
+            template.abilities = ["dex","wis","str"];
             template.spell_list= [];
             break;
         case "non-humanoid":
             template.class = "Non-Humanoid";
-            template.attributes = ["con","dex","str"];
+            template.abilities = ["con","dex","str"];
             template.spell_list= [];
             break;
         case "wizard":
             template.class = "Wizard";
-            template.attributes = ["con","dex","int"];
+            template.abilities = ["con","dex","int"];
             template.spell_list = [
                 ["Chill Touch","Poison Spray","Ray of Frost"],
                 ["Burning Hands","Feather Fall","Mage Armor","Magic Missile","Sleep"],
@@ -582,6 +670,15 @@ async function template_choose(tok){
 
 async function token_update(token, tok){
     await token.document.update(tok.data_to_update);
+}
+
+function treasure_generate(tok){
+    //Decide how to break up remaining wealth into different items
+    //  Coins vs misc
+    
+    let items = [];
+    
+    //Return items
 }
 
 async function weapon_melee_get(tok){
@@ -649,6 +746,11 @@ async function weapon_range_get(tok){
     }
     return weapon_plus_str;
 }
+function xp_get(cr){
+    let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
+    return xp[cr+1];
+}
+
 
 //================================== Dialogs ==================================
 function dialog_options(){
@@ -697,20 +799,16 @@ function dialog_options(){
                     </select>
                 </div>
                 <hr>
-                <div class="form-group">
-                    <label>Template:</label>
-                    <select id="npc_template" name="npc_template">
-                        ` + t_html + `
-                    </select>
-                </div>
-                <hr>
+
+                <!-- re-insert template chooser here-->
+
                 <center><div>NPC Adjustments</div></center>
                 <div class="form-group">    <label>Abilities:</label>     <input id='adjust_abilities' type='checkbox' checked /></div>
-                <div class="form-group">    <label>Age:</label>           <input id='adjust_age' type='checkbox' checked /></div>
+                <!--<div class="form-group">    <label>Age:</label>           <input id='adjust_age' type='checkbox' checked /></div>-->
                 <div class="form-group">    <label>Armor:</label>         <input id='adjust_armor' type='checkbox' checked /></div>
                 <div class="form-group">    <label>HP:</label>            <input id='adjust_hp' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Movement:</label>      <input id='adjust_movement' type='checkbox' checked /></div>
-                <div class="form-group">    <label>Size:</label>          <input id='adjust_size' type='checkbox' checked /></div>
+                <!--<div class="form-group">    <label>Size:</label>          <input id='adjust_size' type='checkbox' checked /></div>-->
                 <div class="form-group">    <label>Spells:</label>        <input id='adjust_spells' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Weapons:</label>       <input id='adjust_weapons' type='checkbox' checked /></div>
                 <hr>
@@ -733,11 +831,12 @@ function dialog_options(){
               
               console.log("opt.cr_change: " + opt.cr_change);
               
-              e = document.getElementById("npc_template");
-              opt.template = e.options[e.selectedIndex].value;
+              //e = document.getElementById("npc_template");
+              //opt.template = e.options[e.selectedIndex].value;
+              opt.template = "generic";
 
               opt.adjust_abilities = document.getElementById("adjust_abilities").checked
-              opt.adjust_ac        = document.getElementById("adjust_ac").checked
+              //opt.adjust_ac        = document.getElementById("adjust_ac").checked
               opt.adjust_armor     = document.getElementById("adjust_armor").checked
               opt.adjust_hp        = document.getElementById("adjust_hp").checked
               opt.adjust_movement  = document.getElementById("adjust_movement").checked
@@ -759,4 +858,15 @@ function dialog_options(){
       },
       default: "yes"
     }).render(true);
+    
+    
+    /* Template Chooser
+                    <div class="form-group">
+                    <label>Template:</label>
+                    <select id="npc_template" name="npc_template">
+                        ` + t_html + `
+                    </select>
+                </div>
+                <hr>
+    */
 }
