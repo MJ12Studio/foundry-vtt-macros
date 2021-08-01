@@ -5,10 +5,16 @@
     1. Macro only for 1st release
     
     2. Must-Have features for public-release:
+    
+        *** Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
+
         Up CR
         Up HP
         Up Abilities
         * Loot
+        
+            ? Social Status bonus for Charisma? I say yes!
+        
             * GP, PP, SP, CP, Gems -- Come up with a way to add these objects from pure code, not compendiums
             * Add a button to just generate loot
             
@@ -45,9 +51,12 @@
                 Nobility        2%      2.00    [Lords,Generals]
                 Royalty         0.1%    4.00    [Dukes,Princes,Kings]
                 
+            *+Pluses for Armor and Weapons needs tweaked to be more fair/random
+                
             *Armor
                 *Change routine to upgrade current armor.
-                *Read for compendiums
+                Read for compendiums
+                *Upgrade progression for armor types
 
             Spells
             *Weapons
@@ -76,6 +85,9 @@
             
             Non-Intelligent        
     
+    
+***** Notes to users:
+    * Upgrading an NPC with less that CR 1 by 0 will make the NPC CR 1.
     
     
     ===============================================================================================
@@ -204,19 +216,26 @@ async function main(opt){
         tok.alignment = TADD.details.alignment;                       //Alignment
         tok.race = TADD.details.race
         tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)
-        tok.xp = xp_get(tok.cr_new);
+        tok.is_humanoid = is_humanoid(TADD.details.type.value);
+        
+        tok.spellcaster_type = TADD.attributes.spellcasting;
+
+        //console.log("before social status")
+
+        //Social Status
+        tok.social_status = roll_bell_curve_1000();
+        tok.luck = roll_bell_curve_1000();
+        tok.xp = experience_points_get(tok.cr_new);
+        tok.adjusted_cr = tok.cr_new * tok.social_status * tok.luck
 
         //Read in template
         tok.template = await template_choose(tok);
-        
-        console.log(tok);
-        console.log(token);
 
         //Adjust Abilities
         if (tok.opt.adjust_abilities){
             for (let ability of tok.template.abilities){
-                console.log("ability to upgrade: " + ability);
-                console.log("   amount to add: " + Math.ceil(tok.cr_new/3));
+                //console.log("ability to upgrade: " + ability);
+                //console.log("   amount to add: " + Math.ceil(tok.cr_new/3));
                 tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.ceil(tok.cr_change_since_orig/3)
             }
         }
@@ -228,108 +247,152 @@ async function main(opt){
             tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
         }
 
+        //Movement
         //Adjust Movement: Adjust up or down by 1 foot per CR 
-        if (opt.adjust_movement){
+        if (!tok.is_humanoid){
             for (let m of ["burrow","climb","fly","swim","walk"]){
                 let cur_m = TADD.attributes.movement[m];
                 if (cur_m > 0){
-                    tok["movement_" + m] = parseInt(cur_m + opt.npc_cr);
-                    tok.data_to_update[AD+"attributes.hp.movement." + m] = tok["movement_" + m];
+                    tok.movement[m] = parseInt(cur_m + tok.cr_new);
+                    tok.data_to_update[AD+"attributes.hp.movement." + m] = tok.movement[m];
                 }
             }
         }
-        
-        
-      
-        /*
+
         //Loop through all token items
         for (let item of token.actor.items){
-            if (item.name.indexOf("Scale NPC Ability")>-1 && tok.opt.adjust_abilities){ tok.items_to_add.push([item.pack, item.name]); }
-            if (item.name === "Scale NPC AC" && tok.opt.adjust_ac){ tok.items_to_add.push([item.pack, item.name]); }
-            if (item.name === "Scale NPC HP" && tok.opt.adjust_hp){ tok.items_to_add.push([item.pack, item.name]); }
-            if (item.name === "Scale NPC Movement" && tok.opt.adjust_movement){ tok.items_to_add.push([item.pack, item.name]); }
-            if (item.type === "spell" && tok.opt.adjust_spells){
-                if (item.data.data.level <= tok.max_spell_level){
-                    tok.items_to_add.push([item.pack, item.name]);
-                }
-            }
-            
-            
-            if (item.name === "weapon" && !tok.is_humanoid){
-                let dam = "";
-                let dam_type = "";
-                let dam_orig = item.data.data.damage.orig_dam;
-                if (dam_orig){
-                    dam = "(" + dam_orig + ") * " + tok.adjust_factor;
-                    dam_type = item.data.data.damage.orig_type;
-                } else {
-                    dam = item.data.data.damage.parts[0][0];
-                    dam_orig = dam;
-                    dam = "(" + dam + ") * " + tok.adjust_factor;
-                    dam_type = item.data.data.damage.parts[0][1];
-
-                    tok.items_updates.push({
-                        _id:item.id, 
-                        data:{
-                            damage:{
-                                orig_dam: dam_orig,
-                                orig_type: dam_type
-                            }
-                        }
-                    });
-                }
-                tok.items_updates.push({
-                    _id:item.id, 
-                    data:{
-                        damage:{
-                            parts: [[dam, dam_type]]
-                        }
+            //console.log("item: " + item.name);
+            //console.log(item);
+            //console.log("is_humanoid: " + tok.is_humanoid)
+            if (tok.is_humanoid){
+                //console.log("   isHumanoid!");
+                //Weapons / Armor
+                if (item.type === "weapon"){
+                    //console.log("   weapon")
+                    let new_name = "";
+                    if (tok.template.weapon_plus > 0){
+                        new_name = " +" + tok.template.weapon_plus;                        
                     }
-                });
+                    let weapon = "";
+                    if (item.data.data.properties.two){
+                        //console.log("   two-handed weapon")
+                        if (item.name.indexOf("bow") > -1){
+                            //console.log("   bow")
+                            //Add a bow
+                            let n = tok.template.weapons_2_handed_range.length;
+                            let r = roll_simple(n)-1;
+                            weapon = tok.template.weapons_2_handed_range[r];
+                        } else {
+                            //console.log("   non-range weapon")
+                            //Add a hand weapon
+                            let n = tok.template.weapons_2_handed.length;
+                            let r = roll_simple(n)-1;
+                            weapon = tok.template.weapons_2_handed[r];
+                        }
+                    } else {
+                        //console.log("   one-handed weapon")
+                        if (item.data.data.properties.amm || item.data.data.properties.thrown){
+                            //Add a ranged one-handed weapon
+                            //console.log(tok.template.weapons_1_handed_range)
+                            //console.log(tok);
+                            let n = tok.template.weapons_1_handed_range.length;
+                            let r = roll_simple(n)-1;
+                            weapon = tok.template.weapons_1_handed_range[r];
+                        } else {
+                            //Add a non-ranged one handed weapon
+                            //console.log(tok.template.weapons_1_handed)
+                            //console.log(tok);
+                            let n = tok.template.weapons_1_handed.length;
+                            let r = roll_simple(n)-1;
+                            weapon = tok.template.weapons_1_handed[r];                            
+                        }
+
+                    }
+                    new_name = weapon + new_name;
+                    //console.log("Trying to add weapon: " + new_name);
+                    tok.items_to_add.push(["dnd5e.items", new_name])
+                } else {
+                    //log("Armor", item.data.data.armor)
+                    if (item.data.data.armor){
+                        let armor_plus_str = await armor_get(tok);
+                        tok.items_to_add.push(["dnd5e.items", armor_plus_str])
+                    }
+                }
+                
+            } else {
+                
+                
             }
-            console.log(tok.items_updates);
-            await items_update(token, tok);
-            
+
         }
         
-        //Update token if humanoid, non-humanoid, both
-        if (!tok.is_humanoid){
-            //Get a social_status
-            tok.social_status = roll_bell_curve_1000();
-            tok.luck = roll_bell_curve_1000();
-            tok.base_gp = experience_points_get(tok.cr_new);
-            tok.gp = tok.social_status * tok.luck * tok.xp;
-
-            if (opt.adjust_armor){
-                let armor_plus_str = await armor_get(tok);
-                tok.items_to_add.push(["dnd5e.items", armor_plus_str])
+        //Add spells for spellcasters
+        //console.log(tok);
+        if (tok.spellcaster_type){
+            for (let level = 1; level <= tok.max_spell_level; level++){
+                //console.log("Level: " + level)
+                for (let spell of tok.template.spell_list[level]){
+                    //console.log("Spell: " + spell)
+                    tok.items_to_add.push(["dnd5e.spells", spell]);
+                }
             }
-            if (opt.adjust_weapons){
-                let weapon_melee_str = await weapon_melee_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_melee_str]);
-                let weapon_range_str = await weapon_range_get(tok);
-                tok.items_to_add.push(["dnd5e.items", weapon_range_str]);
-            }
-
-        } else {
-        
-            
+            tok.data_to_update[AD+"details.spellLevel"] = tok.cr_new;
         }
-        */
         
-        
+
 
         //Do all updates that need done to this token
         await item_types_remove(token, tok);                //Remove all selected item types
         await items_add(token, tok.items_to_add);           //Add all items
         await items_equip_all(token);                       //Equip, identify, make proficient all items
         await token.document.update(tok.data_to_update);    //Update all token data at once!
+        
+        
+        
+        //Add coins, treasure
+        tok.base_gp = parseInt((parseInt(tok.xp/10) * tok.social_status * tok.luck) + parseInt(roll_simple(tok.adjusted_cr)));
+        let gem_percent = 50 + roll_simple(50);
+        let gem_value = parseInt(tok.base_gp * (gem_percent/100));
+        let gem_qty = roll_simple(tok.cr_new);
+        let gp_value = tok.base_gp - gem_value;
+        if (gem_value > 0){
+            await token.actor.createEmbeddedDocuments(
+                "Item",
+                [
+                    {
+                        name: "Gems",
+                        type: "loot",
+                        data: {
+                            quantity: gem_qty,
+                            price: gem_value,
+                        },
+                    },
+                ],
+            );
+            if (gp_value > 0){
+                await token.actor.createEmbeddedDocuments(
+                    "Item",
+                    [
+                        {
+                            name: "Gold Pieces (" + gp_value + ")",
+                            type: "loot",
+                            data: {
+                                quantity: gp_value,
+                                price: gp_value,
+                            },
+                        },
+                    ],
+                );
+            }
+        }
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
 
+
+        console.group("tok group");
         console.log(tok);
         console.log(token);
-        console.log(token.actor.data.data);
-        
+        console.log(token.actor.data.items);
+        console.groupEnd();
         
     }
     console.log("Finished processing tokens...");
@@ -366,49 +429,30 @@ async function main(opt){
   =================================================================*/
 async function armor_get(tok){
     let armor = [];
-    armor.push("None");                     // 10 1
-    armor.push("Padded Armor");             // 11 2
-    armor.push("Leather Armor");            // 11 3
-    armor.push("Studded Leather Armor");    // 12 4
-    armor.push("Hide Armor");               // 12 5
-    armor.push("Chain Shirt");              // 13 6
-    armor.push("Breastplate");              // 14 7
-    armor.push("Ring Mail");                // 14 8
-    armor.push("Scale Mail");               // 14 9
-    armor.push("Half Plate Armor");         // 15 10
-    armor.push("Chain Mail");               // 16 11
-    armor.push("Splint Armor");             // 17 12
-    armor.push("Plate Armor");              // 18 13
-    
-    /*
-    CR * (100-500) * (social_level)(0-4)
-    
-    12000 
-    
-    2000 Plate
-    +3 1000
-    
-    100
-    2900 +2
-    */
-    
-    
+    armor.push("None");                     // 10 0
+    armor.push("Padded Armor");             // 11 1
+    armor.push("Leather Armor");            // 11 2
+    armor.push("Studded Leather Armor");    // 12 3
+    armor.push("Hide Armor");               // 12 4
+    armor.push("Chain Shirt");              // 13 5
+    armor.push("Breastplate");              // 14 6
+    armor.push("Ring Mail");                // 14 7
+    armor.push("Scale Mail");               // 14 8
+    armor.push("Half Plate Armor");         // 15 9
+    armor.push("Chain Mail");               // 16 10
+    armor.push("Splint Armor");             // 17 11
+    armor.push("Plate Armor");              // 18 12
     let armor_number = 0;
-    if (tok.cr_new > 0 && tok.cr_new < 5){ armor_number = roll_simple(4); }
-    if (tok.cr_new > 4 && tok.cr_new < 9){ armor_number = roll_simple(4) + 4; }
-    if (tok.cr_new >= 10){                 armor_number = roll_simple(4) + 8; }
-    
-    //Add a plus to the armor
-    let armor_plus = parseInt(tok.cr_new / 4);
-    let armor_plus_str = "";
-    if (armor_plus == 0){
-        armor_plus_str = armor[armor_number];
-    } else if (armor_plus > 3){
-        armor_plus_str = armor[armor_number] + " +3";
+    let adjusted_cr = tok.cr_new * tok.luck * tok.social_status;
+    if (adjusted_cr > 12){ adjusted_cr = 12; }
+    if (adjusted_cr > 0 && adjusted_cr < 5){ armor_number = roll_simple(4); }
+    if (adjusted_cr > 4 && adjusted_cr < 9){ armor_number = roll_simple(4) + 4; }
+    if (adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
+    if (tok.template.armor_plus > 0){
+        return armor[armor_number] + " +" + tok.template.armor_plus;
     } else {
-        armor_plus_str = armor[armor_number] + " +" + armor_plus;
+        return armor[armor_number];
     }
-    return armor_plus_str;
 }
 async function can_cast_spells(token){
     let spellcasting = false;
@@ -420,7 +464,8 @@ async function can_cast_spells(token){
     return spellcasting;
 }
 function is_humanoid(type){
-    if (["celestial","fey","fiend","giant","humanoid"].includes(type)){
+    //console.log("is_humanoid: " + type);
+    if (["celestial","fey","fiend","giant","humanoid"].includes(type) || type.indexOf("umanoid")> -1){
         return true;
     } else {
         return false;
@@ -433,7 +478,9 @@ async function item_types_remove(token, tok){
     if (tok.opt.clear_features){ item_types_to_delete.push("feat"); }
     if (tok.opt.clear_spells){   item_types_to_delete.push("spell"); }
     if (tok.opt.clear_weapons){  item_types_to_delete.push("weapon"); }
+    item_types_to_delete.push("loot");
     for (let i of token.actor.items){
+        console.log(i.name + " : " + i.type)
         if (item_types_to_delete.includes(i.type)){
             tok.items_to_delete.push(i._id);
         }
@@ -442,13 +489,15 @@ async function item_types_remove(token, tok){
 }
 
 async function items_add(token, items) {
+    console.log(token);
+    console.log(items);
     let entities = []
     for (let i of items){
         let pack = await game.packs.get(i[0]);
         let index = await pack.getIndex();
         let entry = await index.find(e => e.name === i[1]);
         
-        //console.log(entry)
+        console.log(entry)
         
         let entity = await pack.getDocument(entry._id);
         entities.push(entity.data.toObject());
@@ -539,8 +588,8 @@ function roll_no1_no2(qty, d){
     return total;
 }
 
-async function spells_get(tok){
-    let spell_count_by_level = [
+async function spellslots_get(tok){
+    let spellslots = [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [1, 2, 0, 0, 0, 0, 0, 0, 0, 0],
       [1, 3, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -565,6 +614,7 @@ async function spells_get(tok){
     ];
 
     //Add all spells per level
+    /*
     let all_spells = [];
     let cr = tok.cr_new;
     if (cr > 20){ cr = 20;};
@@ -581,7 +631,8 @@ async function spells_get(tok){
             }
         }
     }
-    return all_spells;
+    */
+    return spellslots[tok.cr_new];
 }
 
 function spell_level_get_max(cr){
@@ -601,25 +652,41 @@ function spell_level_get_max(cr){
 async function template_choose(tok){
     let template = [];
     let type = tok.opt.template_str;
+    //                 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 
+    //let armor_plus  = [0,0,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3];
+    //let shield_plus = [0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3];
+    //let weapon_plus = [0,0,0,0,1,1,1,1,2,2,2,2,2,2,2,2,2,2,3,3,3];
+
+    let adjusted_cr = tok.cr_new * tok.social_status * tok.luck;
+    template.armor_plus  = 0;
+    template.shield_plus = 0;
+    template.weapon_plus = 0;
+    if (adjusted_cr > 1){ template.armor_plus  = parseInt((adjusted_cr /7)); }
+    if (adjusted_cr > 6){ template.shield_plus = parseInt((adjusted_cr /7)); }
+    if (adjusted_cr > 4){ template.weapon_plus = parseInt((adjusted_cr /7)); }
+    
+    //console.log(tok);
 
     //Even if "generic" was chosen, use some sense to figure out what kind of NPC we are dealing with
-    if (tok.type == "humanoid"){
-        if (type == "generic"){
-            //Figure out if npc can cast spells
-            if (tok.spellcasting){
-                if (tok.spellcaster_type == "wis"){
-                    template.class = "cleric";
-                } else {
-                    template.class = "wizard";
-                }            
+    if (tok.is_humanoid){
+        //Figure out if npc can cast spells
+        if (tok.spellcaster_type){
+            if (tok.spellcaster_type == "wis"){
+                template.class = "cleric";
             } else {
-                template.class = "fighter";
-            }
+                template.class = "wizard";
+            }            
+        } else {
+            template.class = "fighter";
         }
     } else {
         //Non-Humanoid
         template.class = "non-humanoid";
     }
+    
+    console.log("Template class: " + template.class);
+    
+    
     switch(template.class){
         case "cleric":
             template.class = "Cleric";
@@ -636,11 +703,19 @@ async function template_choose(tok){
                 ["Antimagic Field","Control Weather","Earthquake"],
                 ["Gate","Mass Heal","True Resurrection"]
             ];
+            template.weapons_1_handed = ["Battleaxe","Flail","Handaxe","Light Hammer","Longsword","Mace","Morningstar","Scimitar","Shortsword","Sickle","War Pick","Warhammer"];
+            template.weapons_2_handed = ["Glaive","Greataxe", "Greatsword","Halberd","Maul","Pike","Spear","Trident"];
+            template.weapons_1_handed_range = ["Hand Crossbow"];
+            template.weapons_2_handed_range = ["Light Crossbow","Shortbow"];
             break;
         case "fighter":
             template.class = "Fighter";
             template.abilities = ["dex","wis","str"];
             template.spell_list= [];
+            template.weapons_1_handed = ["Battleaxe","Flail","Handaxe","Light Hammer","Longsword","Mace","Morningstar","Rapier","Scimitar","Shortsword","Sickle","War Pick","Warhammer","Whip"];
+            template.weapons_2_handed = ["Glaive","Greataxe", "Greatsword","Halberd","Maul","Pike","Spear","Trident"];
+            template.weapons_1_handed_range = ["Blowgun","Hand Crossbow","Shortbow","Sling"];
+            template.weapons_2_handed_range = ["Heavy Crossbow","Javelin","Longbow","Light Crossbow"];
             break;
         case "non-humanoid":
             template.class = "Non-Humanoid";
@@ -662,9 +737,13 @@ async function template_choose(tok){
                 ["Mind Blank","Maze","Power Word Stun"],
                 ["Imprisonment","Meteor Swarm","Power Word Kill"]
             ];
+            template.weapons_1_handed = ["Dagger","Dart"];
+            template.weapons_2_handed = ["Quarterstaff"];
+            template.weapons_1_handed_range = ["Dart"];
+            template.weapons_2_handed_range = [];
             break;
     }
-    console.log(template);
+    //console.log(template);
     return template;
 }
 
@@ -746,9 +825,9 @@ async function weapon_range_get(tok){
     }
     return weapon_plus_str;
 }
-function xp_get(cr){
+function experience_points_get(cr){
     let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
-    return xp[cr+1];
+    return xp[cr];
 }
 
 
@@ -869,4 +948,10 @@ function dialog_options(){
                 </div>
                 <hr>
     */
+}
+
+function log(group, logStr){
+    console.group(group);
+    console.log(logStr);
+    console.groupEnd();
 }
