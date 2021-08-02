@@ -153,12 +153,13 @@ async function main(opt){
         let tok = [];                               //tok = temp object holding adjustments.
         tok.abilities = [];
         tok.data_to_update = [];
-        tok.items_to_add = [];
+        tok.items_to_add_compendium = [];
         tok.items_to_delete = [];
         tok.items_updates = [];
         tok.movement = [];
         tok.opt = opt;                              //tok.opt = options from HTML dialog form
         tok.originals = [];
+        tok.items_to_add_raw = [];
 
         //CR and adjustment_factor
         tok.cr = TADD.details.cr;
@@ -310,12 +311,12 @@ async function main(opt){
                     }
                     new_name = weapon + new_name;
                     //console.log("Trying to add weapon: " + new_name);
-                    tok.items_to_add.push(["dnd5e.items", new_name])
+                    tok.items_to_add_compendium.push(["dnd5e.items", new_name])
                 } else {
                     //log("Armor", item.data.data.armor)
                     if (item.data.data.armor){
                         let armor_plus_str = await armor_get(tok);
-                        tok.items_to_add.push(["dnd5e.items", armor_plus_str])
+                        tok.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
                     }
                 }
                 
@@ -333,22 +334,12 @@ async function main(opt){
                 //console.log("Level: " + level)
                 for (let spell of tok.template.spell_list[level]){
                     //console.log("Spell: " + spell)
-                    tok.items_to_add.push(["dnd5e.spells", spell]);
+                    tok.items_to_add_compendium.push(["dnd5e.spells", spell]);
                 }
             }
             tok.data_to_update[AD+"details.spellLevel"] = tok.cr_new;
         }
-        
 
-
-        //Do all updates that need done to this token
-        await item_types_remove(token, tok);                //Remove all selected item types
-        await items_add(token, tok.items_to_add);           //Add all items
-        await items_equip_all(token);                       //Equip, identify, make proficient all items
-        await token.document.update(tok.data_to_update);    //Update all token data at once!
-        
-        
-        
         //Add coins, treasure
         tok.base_gp = parseInt((parseInt(tok.xp/10) * tok.social_status * tok.luck) + parseInt(roll_simple(tok.adjusted_cr)));
         let gem_percent = 50 + roll_simple(50);
@@ -356,6 +347,35 @@ async function main(opt){
         let gem_qty = roll_simple(tok.cr_new);
         let gp_value = tok.base_gp - gem_value;
         if (gem_value > 0){
+            tok.items_to_add_raw.push({
+                name: "Gems",
+                type: "loot",
+                data: {
+                    quantity: gem_qty,
+                    price: gem_value,
+                }
+            });
+        }
+        if (gp_value > 0){
+            tok.items_to_add_raw.push({
+                name: "Gold Pieces (" + gp_value + ")",
+                type: "loot",
+                data: {
+                    quantity: gp_value,
+                    price: gp_value,
+                },
+            });
+        }
+
+
+        //Do all updates that need done to this token
+        await item_types_remove(token, tok);                //Remove all selected item types
+        await items_add(token, tok);                        //Add all items
+        await items_equip_all(token);                       //Equip, identify, make proficient all items
+        await token.document.update(tok.data_to_update);    //Update all token data at once!
+        await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
+
+            /*
             await token.actor.createEmbeddedDocuments(
                 "Item",
                 [
@@ -383,10 +403,9 @@ async function main(opt){
                         },
                     ],
                 );
-            }
+            }            
         }
-        await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
-
+        */
 
         console.group("tok group");
         console.log(tok);
@@ -471,7 +490,6 @@ function is_humanoid(type){
         return false;
     }
 }
-
 async function item_types_remove(token, tok){
     let item_types_to_delete = [];
     if (tok.opt.clear_armor){    item_types_to_delete.push("equipment"); }
@@ -487,12 +505,13 @@ async function item_types_remove(token, tok){
     }
     await items_delete(token, tok.items_to_delete)
 }
-
-async function items_add(token, items) {
+async function items_add(token, tok) {
     console.log(token);
-    console.log(items);
-    let entities = []
-    for (let i of items){
+    console.log(tok.items_to_add_compendium);
+    console.log(tok.items_to_add_raw);
+
+    //let entities = []
+    for (let i of tok.items_to_add_compendium){
         let pack = await game.packs.get(i[0]);
         let index = await pack.getIndex();
         let entry = await index.find(e => e.name === i[1]);
@@ -500,10 +519,14 @@ async function items_add(token, items) {
         console.log(entry)
         
         let entity = await pack.getDocument(entry._id);
-        entities.push(entity.data.toObject());
+        //entities.push(entity.data.toObject());
+        tok.items_to_add_raw.push(entity.data.toObject());
     }
     //console.log(entities);
-    await token.actor.createEmbeddedDocuments("Item", entities);
+    //await token.actor.createEmbeddedDocuments("Item", entities);
+    
+    console.log(tok);
+    await token.actor.createEmbeddedDocuments("Item", tok.items_to_add_raw);
 }
 
 async function items_delete(token, items){
@@ -829,8 +852,6 @@ function experience_points_get(cr){
     let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
     return xp[cr];
 }
-
-
 //================================== Dialogs ==================================
 function dialog_options(){
     console.log("dialog_options");
