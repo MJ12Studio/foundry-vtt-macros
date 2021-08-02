@@ -3,14 +3,25 @@
     Public Release notes
     ===============================================================================================
     1. Macro only for 1st release
-    
     2. Must-Have features for public-release:
+
+        =============== Completed Features ===============
+        * Adjust CR, HP, Abilities, Movement, Spells, Weapons, Armor
+            * Figured out how to add items for compendiums on the fly
+            * Figured out how to add items on the fly from raw data
+        * Social Status, Luck
+        * Add gold, Gems
+        * Templates
+        
+        =============== To-Do's ===============
+        
+        __ Choose Gender?  May help choose things like jewelry
+        __ Choose name?
+        
+            
     
         *** Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
 
-        Up CR
-        Up HP
-        Up Abilities
         * Loot
         
             ? Social Status bonus for Charisma? I say yes!
@@ -41,27 +52,10 @@
 
 
         For Humanoid NPC
-            *Social Class
-                Pick From a Bell curve distribution
-                Dirt Poor       0.1%    0.25    [Unskilled people,laborers,soldiers]
-                Poor            2%      0.50    [Unskilled people,laborers,soldiers]
-                Below Average   14%     0.75    [Unskilled people,laborers,soldiers]
-                Average         68%     1.00    [People with Skills,soldiers]
-                Above Average   14%     1.50    [Knights,Captains,Lieutenants]
-                Nobility        2%      2.00    [Lords,Generals]
-                Royalty         0.1%    4.00    [Dukes,Princes,Kings]
+
                 
             *+Pluses for Armor and Weapons needs tweaked to be more fair/random
                 
-            *Armor
-                *Change routine to upgrade current armor.
-                Read for compendiums
-                *Upgrade progression for armor types
-
-            Spells
-            *Weapons
-                *Change routine to upgrade current weapon(s).
-                *Read for compendiums
                 
             * Multi-attacks (Fighters get theirs at level 3)
                 *Add or Upgrade
@@ -93,7 +87,6 @@
     ===============================================================================================
 
     Questions:
-        * Which NPCs get multi-attacks, how many attacks, at what CR
         
         * Armor
             Need a better way to hand out armor
@@ -108,9 +101,8 @@
     ===============================
     * Can we create an item on the fly without a compendium
     * DAE Item that heals when certain damage would be taken
-    ?? Check out "Cast a Spell" monster feature
     Features based on Monster type (Undead, beast, celestial)
-    Scale CR > 20
+
     Which Non-Humanoids can wear armor, use weapons?
         Make lookup tables for this.
     * Come up with various ways to distribute loot
@@ -119,11 +111,6 @@
 
 
     Items (Magic Items)
-    Loot
-    
-
-    Non-Human NPCs (Creatures)
-        Features
         
         
         
@@ -133,11 +120,10 @@
             
             
     Add more randomness to HP
-    
-    Last Update: 2021.07.28a
+
 */
 
-dialog_options();
+dialog_start();
 
 async function main(opt){
     opt.npc_count = await npc_count_get();
@@ -152,115 +138,63 @@ async function main(opt){
         //Reset some params for each token
         let tok = [];                               //tok = temp object holding adjustments.
         tok.abilities = [];
-        tok.data_to_update = [];
+        tok.data_to_update = [];                    //List of values to update in a token
         tok.items_to_add_compendium = [];
-        tok.items_to_delete = [];
-        tok.items_updates = [];
+        tok.items_to_add_raw = [];
+        tok.items_to_delete = [];                   //List of items to delete
+        tok.items_updates = [];                     //List of updates to make to items
         tok.movement = [];
         tok.opt = opt;                              //tok.opt = options from HTML dialog form
         tok.originals = [];
-        tok.items_to_add_raw = [];
 
-        //CR and adjustment_factor
-        tok.cr = TADD.details.cr;
-        if (tok.cr < 1){ tok.cr = 1; }
-        tok.originals.cr = TADD.originals?.cr;
-        if (!tok.originals.cr){
-            tok.originals.cr = tok.cr;
-            tok.data_to_update[AD+"originals.cr"] =     tok.originals.cr;
-            tok.data_to_update[AD+"originals.cha"] =    TADD.abilities.cha.value;
-            tok.data_to_update[AD+"originals.con"] =    TADD.abilities.con.value;
-            tok.data_to_update[AD+"originals.dex"] =    TADD.abilities.dex.value;
-            tok.data_to_update[AD+"originals.int"] =    TADD.abilities.int.value;
-            tok.data_to_update[AD+"originals.str"] =    TADD.abilities.str.value;
-            tok.data_to_update[AD+"originals.wis"] =    TADD.abilities.wis.value;
-            tok.data_to_update[AD+"originals.burrow"] = TADD.attributes.movement.burrow;
-            tok.data_to_update[AD+"originals.climb"] =  TADD.attributes.movement.climb;
-            tok.data_to_update[AD+"originals.fly"] =    TADD.attributes.movement.fly;
-            tok.data_to_update[AD+"originals.swim"] =   TADD.attributes.movement.swim;
-            tok.data_to_update[AD+"originals.walk"] =   TADD.attributes.movement.walk;
-
-            tok.abilities.cha = TADD.abilities.cha.value;
-            tok.abilities.con = TADD.abilities.con.value;
-            tok.abilities.dex = TADD.abilities.dex.value;
-            tok.abilities.int = TADD.abilities.int.value;
-            tok.abilities.str = TADD.abilities.str.value;
-            tok.abilities.wis = TADD.abilities.wis.value;
-            
-            tok.movement.burrow = TADD.attributes.movement.burrow;
-            tok.movement.climb =  TADD.attributes.movement.climb;
-            tok.movement.fly=     TADD.attributes.movement.fly;
-            tok.movement.swim =   TADD.attributes.movement.swim;
-            tok.movement.walk =   TADD.attributes.movement.walk;
-        } else {
-            tok.abilities.cha = TADD.originals.cha;
-            tok.abilities.con = TADD.originals.con;
-            tok.abilities.dex = TADD.originals.dex;
-            tok.abilities.int = TADD.originals.int;
-            tok.abilities.str = TADD.originals.str;
-            tok.abilities.wis = TADD.originals.wis;
-            
-            tok.movement.burrow = TADD.originals.burrow;
-            tok.movement.climb =  TADD.originals.climb;
-            tok.movement.fly=     TADD.originals.fly;
-            tok.movement.swim =   TADD.originals.swim;
-            tok.movement.walk =   TADD.originals.walk;
-        }
-        tok.cr_new = tok.cr + opt.cr_change;
-        if (tok.cr_new < 1){ tok.cr_new = 1; }
-        tok.data_to_update[AD+"details.cr"] = tok.cr_new;
-        tok.cr_change_since_orig = tok.cr_new - tok.originals.cr;
-        tok.adjust_factor = tok.cr_new / tok.originals.cr;
-        tok.max_spell_level = spell_level_get_max(tok.cr_new);
+        await cr_and_originals_get(tok, AD, TADD, opt);  //CR and originals
 
         //Misc Token info
         tok.alignment = TADD.details.alignment;                       //Alignment
+        tok.gender = gender_get();
         tok.race = TADD.details.race
-        tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)
         tok.is_humanoid = is_humanoid(TADD.details.type.value);
-        
+        tok.max_spell_level = spell_level_get_max(tok.cr_new);
         tok.spellcaster_type = TADD.attributes.spellcasting;
 
-        //console.log("before social status")
-
-        //Social Status
+        //Social Status, Luck
         tok.social_status = roll_bell_curve_1000();
         tok.luck = roll_bell_curve_1000();
         tok.xp = experience_points_get(tok.cr_new);
-        tok.adjusted_cr = tok.cr_new * tok.social_status * tok.luck
+        tok.adjusted_cr = Math.round(tok.cr_new * tok.social_status * tok.luck);    //Rounds up if >= 0.5
 
         //Read in template
         tok.template = await template_choose(tok);
 
-        //Adjust Abilities
+        //tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)        
+
+        //Abilities Adjust
         if (tok.opt.adjust_abilities){
             for (let ability of tok.template.abilities){
                 //console.log("ability to upgrade: " + ability);
-                //console.log("   amount to add: " + Math.ceil(tok.cr_new/3));
-                tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.ceil(tok.cr_change_since_orig/3)
+                tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.round(tok.cr_change_since_orig/3)
             }
         }
 
-        //Adjust HP
+        //HP Adjust
         if (opt.adjust_hp){
             let hp = TADD.attributes.hp.max;
-            tok.hp = parseInt(tok.cr_new * 12) + (Math.ceil((tok.abilities.con - 10) / 2) * tok.cr_new);
+            tok.hp = (tok.cr_new * 12) + (Math.round((tok.abilities.con - 10) / 2) * tok.cr_new);
             tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
         }
 
-        //Movement
-        //Adjust Movement: Adjust up or down by 1 foot per CR 
+        //Movement Adjust: Adjust up or down by 1 foot per CR 
         if (!tok.is_humanoid){
             for (let m of ["burrow","climb","fly","swim","walk"]){
                 let cur_m = TADD.attributes.movement[m];
                 if (cur_m > 0){
-                    tok.movement[m] = parseInt(cur_m + tok.cr_new);
+                    tok.movement[m] = Math.round(cur_m + tok.cr_new);
                     tok.data_to_update[AD+"attributes.hp.movement." + m] = tok.movement[m];
                 }
             }
         }
 
-        //Loop through all token items
+        //Items Adjust
         for (let item of token.actor.items){
             //console.log("item: " + item.name);
             //console.log(item);
@@ -328,12 +262,9 @@ async function main(opt){
         }
         
         //Add spells for spellcasters
-        //console.log(tok);
         if (tok.spellcaster_type){
             for (let level = 1; level <= tok.max_spell_level; level++){
-                //console.log("Level: " + level)
                 for (let spell of tok.template.spell_list[level]){
-                    //console.log("Spell: " + spell)
                     tok.items_to_add_compendium.push(["dnd5e.spells", spell]);
                 }
             }
@@ -341,9 +272,9 @@ async function main(opt){
         }
 
         //Add coins, treasure
-        tok.base_gp = parseInt((parseInt(tok.xp/10) * tok.social_status * tok.luck) + parseInt(roll_simple(tok.adjusted_cr)));
+        tok.base_gp = Math.round((Math.round(tok.xp/10) * tok.social_status * tok.luck) + roll_simple(tok.adjusted_cr));
         let gem_percent = 50 + roll_simple(50);
-        let gem_value = parseInt(tok.base_gp * (gem_percent/100));
+        let gem_value = Math.round(tok.base_gp * (gem_percent/100));
         let gem_qty = roll_simple(tok.cr_new);
         let gp_value = tok.base_gp - gem_value;
         if (gem_value > 0){
@@ -367,45 +298,12 @@ async function main(opt){
             });
         }
 
-
         //Do all updates that need done to this token
         await item_types_remove(token, tok);                //Remove all selected item types
         await items_add(token, tok);                        //Add all items
         await items_equip_all(token);                       //Equip, identify, make proficient all items
         await token.document.update(tok.data_to_update);    //Update all token data at once!
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
-
-            /*
-            await token.actor.createEmbeddedDocuments(
-                "Item",
-                [
-                    {
-                        name: "Gems",
-                        type: "loot",
-                        data: {
-                            quantity: gem_qty,
-                            price: gem_value,
-                        },
-                    },
-                ],
-            );
-            if (gp_value > 0){
-                await token.actor.createEmbeddedDocuments(
-                    "Item",
-                    [
-                        {
-                            name: "Gold Pieces (" + gp_value + ")",
-                            type: "loot",
-                            data: {
-                                quantity: gp_value,
-                                price: gp_value,
-                            },
-                        },
-                    ],
-                );
-            }            
-        }
-        */
 
         console.group("tok group");
         console.log(tok);
@@ -462,11 +360,10 @@ async function armor_get(tok){
     armor.push("Splint Armor");             // 17 11
     armor.push("Plate Armor");              // 18 12
     let armor_number = 0;
-    let adjusted_cr = tok.cr_new * tok.luck * tok.social_status;
-    if (adjusted_cr > 12){ adjusted_cr = 12; }
-    if (adjusted_cr > 0 && adjusted_cr < 5){ armor_number = roll_simple(4); }
-    if (adjusted_cr > 4 && adjusted_cr < 9){ armor_number = roll_simple(4) + 4; }
-    if (adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
+    if (tok.adjusted_cr > 12){ tok.adjusted_cr = 12; }
+    if (tok.adjusted_cr > 0 && tok.adjusted_cr < 5){ armor_number = roll_simple(4); }
+    if (tok.adjusted_cr > 4 && tok.adjusted_cr < 9){ armor_number = roll_simple(4) + 4; }
+    if (tok.adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
     if (tok.template.armor_plus > 0){
         return armor[armor_number] + " +" + tok.template.armor_plus;
     } else {
@@ -482,9 +379,64 @@ async function can_cast_spells(token){
     }
     return spellcasting;
 }
+async function cr_and_originals_get(tok, AD, TADD, opt){
+    //CR and originals
+    tok.cr = TADD.details.cr;
+    if (tok.cr < 1){ tok.cr = 1; }
+    tok.originals.cr = TADD.originals?.cr;
+    if (!tok.originals.cr){
+        tok.originals.cr = tok.cr;
+        tok.data_to_update[AD+"originals.cr"] =     tok.originals.cr;
+        tok.data_to_update[AD+"originals.cha"] =    TADD.abilities.cha.value;
+        tok.data_to_update[AD+"originals.con"] =    TADD.abilities.con.value;
+        tok.data_to_update[AD+"originals.dex"] =    TADD.abilities.dex.value;
+        tok.data_to_update[AD+"originals.int"] =    TADD.abilities.int.value;
+        tok.data_to_update[AD+"originals.str"] =    TADD.abilities.str.value;
+        tok.data_to_update[AD+"originals.wis"] =    TADD.abilities.wis.value;
+        tok.data_to_update[AD+"originals.burrow"] = TADD.attributes.movement.burrow;
+        tok.data_to_update[AD+"originals.climb"] =  TADD.attributes.movement.climb;
+        tok.data_to_update[AD+"originals.fly"] =    TADD.attributes.movement.fly;
+        tok.data_to_update[AD+"originals.swim"] =   TADD.attributes.movement.swim;
+        tok.data_to_update[AD+"originals.walk"] =   TADD.attributes.movement.walk;
+
+        tok.abilities.cha = TADD.abilities.cha.value;
+        tok.abilities.con = TADD.abilities.con.value;
+        tok.abilities.dex = TADD.abilities.dex.value;
+        tok.abilities.int = TADD.abilities.int.value;
+        tok.abilities.str = TADD.abilities.str.value;
+        tok.abilities.wis = TADD.abilities.wis.value;
+        
+        tok.movement.burrow = TADD.attributes.movement.burrow;
+        tok.movement.climb =  TADD.attributes.movement.climb;
+        tok.movement.fly=     TADD.attributes.movement.fly;
+        tok.movement.swim =   TADD.attributes.movement.swim;
+        tok.movement.walk =   TADD.attributes.movement.walk;
+    } else {
+        tok.abilities.cha = TADD.originals.cha;
+        tok.abilities.con = TADD.originals.con;
+        tok.abilities.dex = TADD.originals.dex;
+        tok.abilities.int = TADD.originals.int;
+        tok.abilities.str = TADD.originals.str;
+        tok.abilities.wis = TADD.originals.wis;
+        
+        tok.movement.burrow = TADD.originals.burrow;
+        tok.movement.climb =  TADD.originals.climb;
+        tok.movement.fly=     TADD.originals.fly;
+        tok.movement.swim =   TADD.originals.swim;
+        tok.movement.walk =   TADD.originals.walk;
+    }
+    tok.cr_new = tok.cr + opt.cr_change;
+    if (tok.cr_new < 1){ tok.cr_new = 1; }
+    tok.data_to_update[AD+"details.cr"] = tok.cr_new;
+    tok.cr_change_since_orig = tok.cr_new - tok.originals.cr;
+}
+function gender_get(){
+    return ["Male","Female"].random();
+}
 function is_humanoid(type){
     //console.log("is_humanoid: " + type);
-    if (["celestial","fey","fiend","giant","humanoid"].includes(type) || type.indexOf("umanoid")> -1){
+    //if (["celestial","fey","fiend","giant","humanoid"].includes(type.toLowerCase()) || type.indexOf("umanoid")> -1){
+    if (["celestial","fey","fiend","giant","humanoid"].includes(type.toLowerCase())){
         return true;
     } else {
         return false;
@@ -528,7 +480,6 @@ async function items_add(token, tok) {
     console.log(tok);
     await token.actor.createEmbeddedDocuments("Item", tok.items_to_add_raw);
 }
-
 async function items_delete(token, items){
     await token.actor.deleteEmbeddedDocuments( "Item", items );
 }
@@ -582,7 +533,7 @@ function party_level_average_get(){
             }
         }
     }
-    return parseInt(party_level_total / party_count);
+    return Math.round(party_level_total / party_count);
 }
 
 function roll_bell_curve_1000(){
@@ -680,13 +631,12 @@ async function template_choose(tok){
     //let shield_plus = [0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3];
     //let weapon_plus = [0,0,0,0,1,1,1,1,2,2,2,2,2,2,2,2,2,2,3,3,3];
 
-    let adjusted_cr = tok.cr_new * tok.social_status * tok.luck;
     template.armor_plus  = 0;
     template.shield_plus = 0;
     template.weapon_plus = 0;
-    if (adjusted_cr > 1){ template.armor_plus  = parseInt((adjusted_cr /7)); }
-    if (adjusted_cr > 6){ template.shield_plus = parseInt((adjusted_cr /7)); }
-    if (adjusted_cr > 4){ template.weapon_plus = parseInt((adjusted_cr /7)); }
+    if (tok.adjusted_cr > 1){ template.armor_plus  = Math.round((tok.adjusted_cr /7)); }
+    if (tok.adjusted_cr > 6){ template.shield_plus = Math.round((tok.adjusted_cr /7)); }
+    if (tok.adjusted_cr > 4){ template.weapon_plus = Math.round((tok.adjusted_cr /7)); }
     
     //console.log(tok);
 
@@ -812,7 +762,7 @@ async function weapon_melee_get(tok){
     weapon_m.push("Whip");
     let weapon_melee_number = roll_simple(25) - 1;
     //Add a plus to the weapons
-    let weapon_plus = parseInt(tok.cr_new / 4);
+    let weapon_plus = Math.round(tok.cr_new / 4);
     let weapon_plus_str = "";
     if (weapon_plus == 0){
         weapon_plus_str = weapon_m[weapon_melee_number];
@@ -837,7 +787,7 @@ async function weapon_range_get(tok){
     weapon_r.push("Light Crossbow");
     let weapon_range_number = roll_simple(10) - 1;
     //Add a plus to the weapons
-    let weapon_plus = parseInt(tok.cr_new / 4);
+    let weapon_plus = Math.round(tok.cr_new / 4);
     let weapon_plus_str = "";
     if (weapon_plus == 0){
         weapon_plus_str = weapon_r[weapon_range_number];
@@ -853,8 +803,8 @@ function experience_points_get(cr){
     return xp[cr];
 }
 //================================== Dialogs ==================================
-function dialog_options(){
-    console.log("dialog_options");
+function dialog_start(){
+    console.log("dialog_start");
     
     //Read in templates
     //let t_html = '<option value="world.mj-template-generic" selected>Generic</option>';
@@ -929,7 +879,7 @@ function dialog_options(){
               let e = document.getElementById("scale-npc-cr");
               opt.cr_change = parseInt(e.options[e.selectedIndex].value);
               
-              console.log("opt.cr_change: " + opt.cr_change);
+              //console.log("opt.cr_change: " + opt.cr_change);
               
               //e = document.getElementById("npc_template");
               //opt.template = e.options[e.selectedIndex].value;
@@ -976,3 +926,9 @@ function log(group, logStr){
     console.log(logStr);
     console.groupEnd();
 }
+function l(logStr){
+    console.log(logStr);
+}
+
+// Javascript Extensions:
+Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
