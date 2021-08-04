@@ -13,12 +13,31 @@
         * Add gold, Gems
         * Templates
         
+        
+        =============== Questions Unanswered ===============
+        Q: Can we use external images for our items?
+        Q: Can we access external javascript data files (github, bitbucket) for lists, arrays?
+        Q: Do we want to make our money on this project? OR drive traffic to something else, like adventure modules?
+            * Adventure modules could be designed to work with NPC Adjust.
+            * Maybe instead of Patreon for this we just sell Adventure modules that auto-scale
+        
+        
+        =============== Questions Answered ===============
+        Q: How do we get our macro accepted to the Community Macros?
+        A: Looks like we need no special permission, we just add it here: https://github.com/foundry-vtt-community/macros
+        
+        
         =============== To-Do's ===============
-        
-        __ Choose Gender?  May help choose things like jewelry
-        __ Choose name?
-        
-            
+
+            == Narrative / Biography ==    
+            __ Should we choose Gender?  May help choose things like jewelry
+            __ Should we choose name?
+            __ Should we include some character traits, disposition, history, etc
+                for flavor and DM use?
+
+        *** Fix AC base value
+
+        *** Add a help button on the start dialog to popup a help dialog.
     
         *** Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
 
@@ -106,8 +125,15 @@
     Which Non-Humanoids can wear armor, use weapons?
         Make lookup tables for this.
     * Come up with various ways to distribute loot
+    
+    * Macro to make magic items easily for DMs
+        * Dialog screen with options
+        
 
-
+    * Make module to be able to use skills
+        * Make magic weapons
+        
+    
 
 
     Items (Magic Items)
@@ -279,7 +305,7 @@ async function main(opt){
         let gp_value = tok.base_gp - gem_value;
         if (gem_value > 0){
             tok.items_to_add_raw.push({
-                name: "Gems",
+                name: "Ancient Necklace",
                 type: "loot",
                 data: {
                     quantity: gem_qty,
@@ -932,3 +958,8 @@ function l(logStr){
 
 // Javascript Extensions:
 Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
+
+
+function get_test(tok){
+    tok.get_test = true;
+}
