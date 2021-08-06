@@ -10,12 +10,13 @@
             * Figured out how to add items for compendiums on the fly
             * Figured out how to add items on the fly from raw data
         * Social Status, Luck
+            * Social Status bonus for Charisma
         * Add gold, Gems
         * Templates
-        
+        * Fix AC base value
+
         
         =============== Questions Unanswered ===============
-        Q: Can we use external images for our items?
         Q: Can we access external javascript data files (github, bitbucket) for lists, arrays?
         Q: Do we want to make our money on this project? OR drive traffic to something else, like adventure modules?
             * Adventure modules could be designed to work with NPC Adjust.
@@ -24,8 +25,11 @@
         
         =============== Questions Answered ===============
         Q: How do we get our macro accepted to the Community Macros?
-        A: Looks like we need no special permission, we just add it here: https://github.com/foundry-vtt-community/macros
-        
+            A: Looks like we need no special permission, we just add it here: https://github.com/foundry-vtt-community/macros
+        Q: Can we use external images for our items?
+            A: Yes. Tested with GitHub.
+        Q: Can we create an item on the fly without a compendium
+            A: Yes... See Gold and treasure
         
         =============== To-Do's ===============
 
@@ -35,46 +39,20 @@
             __ Should we include some character traits, disposition, history, etc
                 for flavor and DM use?
 
-        *** Fix AC base value
+        
 
         *** Add a help button on the start dialog to popup a help dialog.
     
         *** Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
 
-        * Loot
-        
-            ? Social Status bonus for Charisma? I say yes!
-        
-            * GP, PP, SP, CP, Gems -- Come up with a way to add these objects from pure code, not compendiums
+        * Loot that is carried on the NPC
+
             * Add a button to just generate loot
             
-        * Misc Magic Items
-        
-        *Features
-            Auras:
-                "Dark Aura","Death Burst","Fear Aura","Fetid Cloud","Fire Aura"
-            
-            Attacks:
-                Low-Level:  "Acid Spray","Aggressive","Brave","Charge","Cunning Action","Dreadful Glare","Enlarge","Fling","Frost Breath","Heated Body"
-            
-                Medium-level: "Assassinate","Blinding Breath","Blood Frenzy","Deadly Leap","Disrupt Life","Firat Roar","Frightening Gaze","Haste","Healing Touch"
-            
-                High-Damage: "Acid Breath","Channel Negative Energy","Cold Breath","Death Throes","Ethereal Jaunt","Fire Breath","Frightful Presence"
-            
-            *Defense/Immunities:
-                "Acid Absorption","Dark Devotion","Evasion","Fire Absorption","Heal Self","Horrific Appearance"
-                
-                
-            
-            * Senses/Skills
-                "Amphibious","Devil Sight", "Ethereal Sight","Freedom of Movement","Hold Breath"
-
+            * Misc Magic Items
 
         For Humanoid NPC
-
-                
             *+Pluses for Armor and Weapons needs tweaked to be more fair/random
-                
                 
             * Multi-attacks (Fighters get theirs at level 3)
                 *Add or Upgrade
@@ -83,11 +61,7 @@
                     * At 12 = 3 attacks
                 Spellcasters get no multi-attacks
             * Do we add a hierarchy
-        
         For Non-Humanoid NPC
-            * Multi-attacks
-                *Add or Upgrade
-                
             * Scale damage
             
             *** Don't mess with their multi-attacks and their weapons
@@ -95,9 +69,10 @@
             
             Intelligent
                 
-            
+                
             Non-Intelligent        
-    
+                No spells
+                
     
 ***** Notes to users:
     * Upgrading an NPC with less that CR 1 by 0 will make the NPC CR 1.
@@ -112,13 +87,38 @@
             When to add a shield
 
 
+    ===============================
+    Wish list for version 2
+    ===============================
+    Humanoids, Non-humanoids
+        *Features - build in some logic for who gets what
+            Auras:
+                "Dark Aura","Death Burst","Fear Aura","Fetid Cloud","Fire Aura"
+            
+            Attacks:
+                Low-Level:  "Acid Spray","Aggressive","Brave","Charge","Cunning Action","Dreadful Glare","Enlarge","Fling","Frost Breath","Heated Body"
+            
+                Medium-level: "Assassinate","Blinding Breath","Blood Frenzy","Deadly Leap","Disrupt Life","Firat Roar","Frightening Gaze","Haste","Healing Touch"
+            
+                High-Damage: "Acid Breath","Channel Negative Energy","Cold Breath","Death Throes","Ethereal Jaunt","Fire Breath","Frightful Presence"
+            
+            *Defense/Immunities:
+                "Acid Absorption","Dark Devotion","Evasion","Fire Absorption","Heal Self","Horrific Appearance"
 
+    
+    
+    * Senses/Skills
+        "Amphibious","Devil Sight", "Ethereal Sight","Freedom of Movement","Hold Breath"
 
+    * Generate Loot in a horde or treasure chest
 
     ===============================
-    Wish List
+    Wish List for version 3+
     ===============================
-    * Can we create an item on the fly without a compendium
+    
+    * Advanced Settings:
+        * Add ability to tweak settings like CR/level for damage, etc for users
+    
     * DAE Item that heals when certain damage would be taken
     Features based on Monster type (Undead, beast, celestial)
 
@@ -165,10 +165,11 @@ async function main(opt){
         let tok = [];                               //tok = temp object holding adjustments.
         tok.abilities = [];
         tok.data_to_update = [];                    //List of values to update in a token
+        tok.item_types_to_delete = [];
         tok.items_to_add_compendium = [];
         tok.items_to_add_raw = [];
         tok.items_to_delete = [];                   //List of items to delete
-        tok.items_updates = [];                     //List of updates to make to items
+        //tok.items_updates = [];                     //List of updates to make to items
         tok.movement = [];
         tok.opt = opt;                              //tok.opt = options from HTML dialog form
         tok.originals = [];
@@ -184,7 +185,7 @@ async function main(opt){
         tok.spellcaster_type = TADD.attributes.spellcasting;
 
         //Social Status, Luck
-        tok.social_status = roll_bell_curve_1000();
+        tok.social_status = social_status_get(token,tok);
         tok.luck = roll_bell_curve_1000();
         tok.xp = experience_points_get(tok.cr_new);
         tok.adjusted_cr = Math.round(tok.cr_new * tok.social_status * tok.luck);    //Rounds up if >= 0.5
@@ -201,6 +202,9 @@ async function main(opt){
                 tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.round(tok.cr_change_since_orig/3)
             }
         }
+        
+        //Clear AC Flat Value
+        tok.data_to_update[AD+"attributes.ac.flat"] = null;
 
         //HP Adjust
         if (opt.adjust_hp){
@@ -209,8 +213,13 @@ async function main(opt){
             tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
         }
 
-        //Movement Adjust: Adjust up or down by 1 foot per CR 
+        
+        
+    
+        //Do some things based on humanoid/non-humanoid
+        tok.item_types_to_delete.push("loot");
         if (!tok.is_humanoid){
+            //Movement Adjust: Adjust up or down by 1 foot per CR 
             for (let m of ["burrow","climb","fly","swim","walk"]){
                 let cur_m = TADD.attributes.movement[m];
                 if (cur_m > 0){
@@ -218,12 +227,20 @@ async function main(opt){
                     tok.data_to_update[AD+"attributes.hp.movement." + m] = tok.movement[m];
                 }
             }
+        } else {
+            //Humanoid
+            if (tok.opt.clear_armor){    tok.item_types_to_delete.push("equipment"); }
+            //if (tok.opt.clear_features){ item_types_to_delete.push("feat"); }
+            if (tok.opt.clear_spells){   tok.item_types_to_delete.push("spell"); }
+            if (tok.opt.clear_weapons){  tok.item_types_to_delete.push("weapon"); }
+            
         }
 
         //Items Adjust
         for (let item of token.actor.items){
-            //console.log("item: " + item.name);
-            //console.log(item);
+            tok.items_updates = [];
+            console.log("item: " + item.name);
+            console.log(item);
             //console.log("is_humanoid: " + tok.is_humanoid)
             if (tok.is_humanoid){
                 //console.log("   isHumanoid!");
@@ -281,10 +298,48 @@ async function main(opt){
                 }
                 
             } else {
-                
-                
-            }
+                console.log("Non-Humanoid");
+                if (item.type === "weapon"){
+                    let original_damage = item.data.data.original_damage;
+                    console.log("Original original_damage: " + original_damage);
+                    if (!original_damage){
+                        console.log("NO original_damage")
+                        tok.items_updates.push({
+                            _id:item.id,
+                            data: {
+                                original_damage: item.data.data.damage.parts[0][0]
+                            }
+                        });
+                        original_damage = item.data.data.damage.parts[0][0];
+                    } else {
+                        original_damage = item.data.data.damage.parts[0][0];
+                    }
+                    console.log("Original Damage: " + original_damage);
 
+                    let dPos = original_damage.indexOf("d");
+                    let d = parseInt(original_damage.substr(0,dPos));
+                    if (d > 0){
+                        //console.log("D: " + d);
+                        let newD = d + Math.round(tok.cr_change_since_orig/2);
+                        //console.log("newD: " + newD);
+                        if (d + newD < 0){ newD = 1; }
+                        let new_damage = newD + original_damage.substr(dPos,1000);
+                        //console.log("new_damage: " + new_damage);
+                        let damage_type = item.data.data.damage.parts[0][1]
+                        let damage = item.data.data.damage;
+                        //console.log(damage);
+                        damage.parts[0][0] = new_damage;
+                        damage.parts[0][1] = damage_type;
+                        tok.items_updates.push({
+                            _id:item.id,
+                            data: {
+                                damage: damage
+                            }
+                        });
+                    }
+                }
+            }
+            await items_update(item, tok.items_updates);
         }
         
         //Add spells for spellcasters
@@ -330,6 +385,7 @@ async function main(opt){
         await items_equip_all(token);                       //Equip, identify, make proficient all items
         await token.document.update(tok.data_to_update);    //Update all token data at once!
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
+        
 
         console.group("tok group");
         console.log(tok);
@@ -469,15 +525,9 @@ function is_humanoid(type){
     }
 }
 async function item_types_remove(token, tok){
-    let item_types_to_delete = [];
-    if (tok.opt.clear_armor){    item_types_to_delete.push("equipment"); }
-    if (tok.opt.clear_features){ item_types_to_delete.push("feat"); }
-    if (tok.opt.clear_spells){   item_types_to_delete.push("spell"); }
-    if (tok.opt.clear_weapons){  item_types_to_delete.push("weapon"); }
-    item_types_to_delete.push("loot");
     for (let i of token.actor.items){
         console.log(i.name + " : " + i.type)
-        if (item_types_to_delete.includes(i.type)){
+        if (tok.item_types_to_delete.includes(i.type)){
             tok.items_to_delete.push(i._id);
         }
     }
@@ -531,8 +581,9 @@ async function item_equipped_identified_proficient(token, item){
     );
 }
 
-async function items_update(token, tok){
-    await token.actor.updateEmbeddedDocuments("Item", tok.items_updates);
+async function items_update(token, updates){
+    console.log(updates);
+    await token.actor.updateEmbeddedDocuments("Item", updates);
 }
 
 function npc_count_get(){
@@ -647,6 +698,21 @@ function spell_level_get_max(cr){
     if (cr >14) l = 8;
     if (cr >16) l = 9;
     return l;
+}
+function social_status_get(token,tok){
+    let roll = roll_simple(1000);
+    tok.social_status_before = roll;
+    roll += (token.actor.data.data.abilities.cha.mod * 20)
+    tok.social_status_after = roll;
+    switch(true){
+        case (roll<5):   return 0.25; //1-4         4/1000   =  0.4%
+        case (roll<21):  return 0.50; //5-20        16/1000  =  1.6%
+        case (roll<161): return 0.75; //21-160      140/1000 = 14.0%
+        case (roll<841): return 1.00; //161-840     680/1000 = 68.0%
+        case (roll<981): return 1.50; //861-980     140/1000 = 14.0%
+        case (roll<997): return 2.00; //981-996     16/1000  =  1.6%
+        default:         return 4.00; //997-1000    4/1000   =  0.4%
+    }
 }
 
 async function template_choose(tok){
