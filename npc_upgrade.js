@@ -14,6 +14,7 @@
         * Add gold, Gems
         * Templates
         * Fix AC base value
+        * Scale Non-Humanoid damage
 
         
         =============== Questions Unanswered ===============
@@ -57,12 +58,11 @@
             * Multi-attacks (Fighters get theirs at level 3)
                 *Add or Upgrade
                 If humanoid AND a fighter-template then:
-                    * At 3 = 2 attacks
-                    * At 12 = 3 attacks
+                    * At 3rd = 2 attacks
+                    * At 12th = 3 attacks
                 Spellcasters get no multi-attacks
             * Do we add a hierarchy
         For Non-Humanoid NPC
-            * Scale damage
             
             *** Don't mess with their multi-attacks and their weapons
                 * Scale damage is OK, but don't clear them and try to add new ones
@@ -111,6 +111,8 @@
         "Amphibious","Devil Sight", "Ethereal Sight","Freedom of Movement","Hold Breath"
 
     * Generate Loot in a horde or treasure chest
+    
+    *** Reset Token Button
 
     ===============================
     Wish List for version 3+
@@ -125,27 +127,29 @@
     Which Non-Humanoids can wear armor, use weapons?
         Make lookup tables for this.
     * Come up with various ways to distribute loot
-    
-    * Macro to make magic items easily for DMs
-        * Dialog screen with options
-        
-
-    * Make module to be able to use skills
-        * Make magic weapons
-        
-    
-
 
     Items (Magic Items)
-        
-        
-        
+
     New Options
         * Have Percentage chance/cr for each selected creature to become a definite class
             Checkbox    and     dropdown percentage picker
-            
-            
+
     Add more randomness to HP
+    
+    ======================= Additional Macros/Modules ==================================
+    * Resurrect entire scene
+        * Give everyone treasure/loot
+        
+    * Make module to be able to use skills
+        * Make magic weapons
+
+    * Token info
+
+    * Monster Survey
+    
+    * Macro to make magic items easily for DMs
+        * Dialog screen with options
+        * Automated routine for generating loot 
 
 */
 
@@ -160,6 +164,64 @@ async function main(opt){
 
         let TADD = token.actor.data.data;           //Used for READING data from token
         let AD   = "actorData.data.";               //Used for WRITING data to token
+
+        /*
+        //Scale all Token info
+            Do we have original_data?
+            CR, HP, Abilities, AC
+            
+        //Scale Items
+            Loop through all items{
+                Do we have original_data?
+                
+                Non-H
+                    Get better Attacks/damage, treasure
+                Humanoid
+                    Get new weapons, armor, spells, shield, treasure, misc items
+            }
+            
+
+        //Scale effects (Maybe)
+        */
+
+        //Check for original data
+        console.log(token.actor);
+        let temp_actorData = token.actor.original_actorData;
+        if (!temp_actorData){
+            console.log("No Original Data");
+            temp_actorData = await token.actor.data;
+            
+            //console.log(token.actor.items);
+            //console.log(typeof token.actor.items)
+            //let temp_items = token.actor.items;
+            //let temp_effects = token.actor.effects;
+
+            let updates = [];
+            updates["actorData.data.original_data"] = temp_actorData;
+            //updates["actorData.data.original_items"] = temp_items.toObject();
+            //updates["actorData.data.original_effects"] = temp_effects.toObject();
+
+            await token.document.update(updates);
+
+            //tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
+            //await token.document.update(tok.data_to_update); 
+        }
+        console.log(token.actor);
+        /*  token.actor.original_data   
+            if (yes){
+                tok = read in original data
+            } no {
+                tok = token.actor.data
+            }
+        */
+        
+        
+        
+        
+        
+        
+
+        continue;
 
         //Reset some params for each token
         let tok = [];                               //tok = temp object holding adjustments.
@@ -326,15 +388,14 @@ async function main(opt){
                         let new_damage = newD + original_damage.substr(dPos,1000);
                         //console.log("new_damage: " + new_damage);
                         let damage_type = item.data.data.damage.parts[0][1]
-                        let damage = item.data.data.damage;
-                        //console.log(damage);
-                        damage.parts[0][0] = new_damage;
-                        damage.parts[0][1] = damage_type;
+                        let data = item.data.data;
+                        console.log(data);
+                        data.damage.parts[0][0] = new_damage;
+                        data.damage.parts[0][1] = damage_type;
                         tok.items_updates.push({
                             _id:item.id,
-                            data: {
-                                damage: damage
-                            }
+                            data: data,
+                            name: "Fucking big fist"
                         });
                     }
                 }
