@@ -162,156 +162,99 @@ async function main(opt){
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         if (token.actor.type != "npc"){ continue; } //Skip it if it's not an npc
 
-        let TADD = token.actor.data.data;           //Used for READING data from token
-        let AD   = "actorData.data.";               //Used for WRITING data to token
+        let TADD = token.actor.data.data;           //Used for READING data from token. Foundry Data
+        let AD   = "actorData.data.";               //Used for WRITING data to token. Foundry Data
+        let tad  = [];                              //Temp array of variables for non-system data
+        tad.item_types_to_delete = [];
+        tad.items_to_add_compendium = [];
+        tad.items_to_add_raw = [];
+        tad.items_to_delete = [];
+        tad.movement = [];
+        tad.opt = opt;
 
-        /*
-        //Scale all Token info
-            Do we have original_data?
-            CR, HP, Abilities, AC
-            
-        //Scale Items
-            Loop through all items{
-                Do we have original_data?
-                
-                Non-H
-                    Get better Attacks/damage, treasure
-                Humanoid
-                    Get new weapons, armor, spells, shield, treasure, misc items
-            }
-            
-
-        //Scale effects (Maybe)
-        */
-
-        //Check for original data
-        console.log(token.actor);
-        let temp_actorData = token.actor.original_actorData;
-        if (!temp_actorData){
-            console.log("No Original Data");
-            temp_actorData = await token.actor.data;
-            
-            //console.log(token.actor.items);
-            //console.log(typeof token.actor.items)
-            //let temp_items = token.actor.items;
-            //let temp_effects = token.actor.effects;
-
-            let updates = [];
-            updates["actorData.data.original_data"] = temp_actorData;
-            //updates["actorData.data.original_items"] = temp_items.toObject();
-            //updates["actorData.data.original_effects"] = temp_effects.toObject();
-
-            await token.document.update(updates);
-
-            //tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
-            //await token.document.update(tok.data_to_update); 
+        //Get/Set original data
+        let original_actorData = TADD.original_actorData;
+        let actorData_updates = [];
+        if (!original_actorData){
+            original_actorData = await token.actor.data;
+            actorData_updates["actorData.data.original_actorData"] = original_actorData;
         }
-        console.log(token.actor);
-        /*  token.actor.original_data   
-            if (yes){
-                tok = read in original data
-            } no {
-                tok = token.actor.data
-            }
-        */
         
-        
-        
-        
-        
-        
-
-        continue;
-
-        //Reset some params for each token
-        let tok = [];                               //tok = temp object holding adjustments.
-        tok.abilities = [];
-        tok.data_to_update = [];                    //List of values to update in a token
-        tok.item_types_to_delete = [];
-        tok.items_to_add_compendium = [];
-        tok.items_to_add_raw = [];
-        tok.items_to_delete = [];                   //List of items to delete
-        //tok.items_updates = [];                     //List of updates to make to items
-        tok.movement = [];
-        tok.opt = opt;                              //tok.opt = options from HTML dialog form
-        tok.originals = [];
-
-        await cr_and_originals_get(tok, AD, TADD, opt);  //CR and originals
+        //Scale basic token info
+        tad.cr = TADD.details.cr;
+        if (tad.cr < 1){ tad.cr = 1; }
+        tad.cr_new = tad.cr + opt.cr_change;
+        if (tad.cr_new < 1){ tad.cr_new = 1; }
+        actorData_updates[AD+"details.cr"] = tad.cr_new;
+        tad.cr_change_since_orig = Math.round(tad.cr_new - original_actorData.data.details.cr);
 
         //Misc Token info
-        tok.alignment = TADD.details.alignment;                       //Alignment
-        tok.gender = gender_get();
-        tok.race = TADD.details.race
-        tok.is_humanoid = is_humanoid(TADD.details.type.value);
-        tok.max_spell_level = spell_level_get_max(tok.cr_new);
-        tok.spellcaster_type = TADD.attributes.spellcasting;
+        tad.alignment = TADD.details.alignment;                       //Alignment
+        tad.gender = gender_get();
+        tad.race = TADD.details.race
+        tad.is_humanoid = is_humanoid(TADD.details.type.value);
+        tad.max_spell_level = spell_level_get_max(tad.cr_new);
+        tad.spellcaster_type = TADD.attributes.spellcasting;
 
         //Social Status, Luck
-        tok.social_status = social_status_get(token,tok);
-        tok.luck = roll_bell_curve_1000();
-        tok.xp = experience_points_get(tok.cr_new);
-        tok.adjusted_cr = Math.round(tok.cr_new * tok.social_status * tok.luck);    //Rounds up if >= 0.5
+        tad.social_status = social_status_get(token,tad);
+        tad.luck = roll_bell_curve_1000();
+        tad.xp = experience_points_get(tad.cr_new);
+        tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
 
         //Read in template
-        tok.template = await template_choose(tok);
-
-        //tok.type = is_humanoid(TADD.details.type.value);              //Type of NPC (Humanoid, etc)        
+        tad.template = await template_choose(tad);
 
         //Abilities Adjust
-        if (tok.opt.adjust_abilities){
-            for (let ability of tok.template.abilities){
-                //console.log("ability to upgrade: " + ability);
-                tok.data_to_update[AD+"abilities." + ability + ".value"] = tok.abilities[ability] + Math.round(tok.cr_change_since_orig/3)
+        if (tad.opt.adjust_abilities){
+            for (let ability of tad.template.abilities){
+                actorData_updates[AD+"abilities." + ability + ".value"] = original_actorData.data.abilities[ability].value + Math.round(tad.cr_change_since_orig/3);
             }
         }
-        
+
         //Clear AC Flat Value
-        tok.data_to_update[AD+"attributes.ac.flat"] = null;
+        actorData_updates[AD+"attributes.ac.flat"] = null;
 
         //HP Adjust
         if (opt.adjust_hp){
             let hp = TADD.attributes.hp.max;
-            tok.hp = (tok.cr_new * 12) + (Math.round((tok.abilities.con - 10) / 2) * tok.cr_new);
-            tok.data_to_update[AD+"attributes.hp.max"] = tok.hp;
+            let con = original_actorData.data.abilities.con.value + Math.round(tad.cr_change_since_orig/3);
+            tad.hp = (tad.cr_new * 12) + (Math.round((con - 10) / 2) * tad.cr_new);
+            actorData_updates[AD+"attributes.hp.max"] = tad.hp;
         }
 
-        
-        
-    
         //Do some things based on humanoid/non-humanoid
-        tok.item_types_to_delete.push("loot");
-        if (!tok.is_humanoid){
+        tad.item_types_to_delete.push("loot");
+        if (!tad.is_humanoid){
             //Movement Adjust: Adjust up or down by 1 foot per CR 
             for (let m of ["burrow","climb","fly","swim","walk"]){
                 let cur_m = TADD.attributes.movement[m];
                 if (cur_m > 0){
-                    tok.movement[m] = Math.round(cur_m + tok.cr_new);
-                    tok.data_to_update[AD+"attributes.hp.movement." + m] = tok.movement[m];
+                    tad.movement[m] = Math.round(cur_m + tad.cr_new);
+                    actorData_updates[AD+"attributes.hp.movement." + m] = tad.movement[m];
                 }
             }
         } else {
-            //Humanoid
-            if (tok.opt.clear_armor){    tok.item_types_to_delete.push("equipment"); }
-            //if (tok.opt.clear_features){ item_types_to_delete.push("feat"); }
-            if (tok.opt.clear_spells){   tok.item_types_to_delete.push("spell"); }
-            if (tok.opt.clear_weapons){  tok.item_types_to_delete.push("weapon"); }
-            
+            console.log("Is Humanoid");
+            if (tad.opt.clear_armor){    tad.item_types_to_delete.push("equipment"); }
+            if (tad.opt.clear_spells){   tad.item_types_to_delete.push("spell"); }
+            if (tad.opt.clear_weapons){  tad.item_types_to_delete.push("weapon"); }
         }
 
         //Items Adjust
         for (let item of token.actor.items){
-            tok.items_updates = [];
-            console.log("item: " + item.name);
-            console.log(item);
+            
+            //console.log("item: " + item.name);
+            //console.log(item);
             //console.log("is_humanoid: " + tok.is_humanoid)
-            if (tok.is_humanoid){
+            if (tad.is_humanoid){
                 //console.log("   isHumanoid!");
                 //Weapons / Armor
                 if (item.type === "weapon"){
                     //console.log("   weapon")
                     let new_name = "";
-                    if (tok.template.weapon_plus > 0){
-                        new_name = " +" + tok.template.weapon_plus;                        
+                    if (tad.template.weapon_plus > 0){
+                        new_name = " +" + tad.template.weapon_plus;                        
                     }
                     let weapon = "";
                     if (item.data.data.properties.two){
@@ -319,15 +262,15 @@ async function main(opt){
                         if (item.name.indexOf("bow") > -1){
                             //console.log("   bow")
                             //Add a bow
-                            let n = tok.template.weapons_2_handed_range.length;
+                            let n = tad.template.weapons_2_handed_range.length;
                             let r = roll_simple(n)-1;
-                            weapon = tok.template.weapons_2_handed_range[r];
+                            weapon = tad.template.weapons_2_handed_range[r];
                         } else {
                             //console.log("   non-range weapon")
                             //Add a hand weapon
-                            let n = tok.template.weapons_2_handed.length;
+                            let n = tad.template.weapons_2_handed.length;
                             let r = roll_simple(n)-1;
-                            weapon = tok.template.weapons_2_handed[r];
+                            weapon = tad.template.weapons_2_handed[r];
                         }
                     } else {
                         //console.log("   one-handed weapon")
@@ -335,38 +278,39 @@ async function main(opt){
                             //Add a ranged one-handed weapon
                             //console.log(tok.template.weapons_1_handed_range)
                             //console.log(tok);
-                            let n = tok.template.weapons_1_handed_range.length;
+                            let n = tad.template.weapons_1_handed_range.length;
                             let r = roll_simple(n)-1;
-                            weapon = tok.template.weapons_1_handed_range[r];
+                            weapon = tad.template.weapons_1_handed_range[r];
                         } else {
                             //Add a non-ranged one handed weapon
                             //console.log(tok.template.weapons_1_handed)
                             //console.log(tok);
-                            let n = tok.template.weapons_1_handed.length;
+                            let n = tad.template.weapons_1_handed.length;
                             let r = roll_simple(n)-1;
-                            weapon = tok.template.weapons_1_handed[r];                            
+                            weapon = tad.template.weapons_1_handed[r];                            
                         }
 
                     }
                     new_name = weapon + new_name;
                     //console.log("Trying to add weapon: " + new_name);
-                    tok.items_to_add_compendium.push(["dnd5e.items", new_name])
+                    tad.items_to_add_compendium.push(["dnd5e.items", new_name])
                 } else {
                     //log("Armor", item.data.data.armor)
                     if (item.data.data.armor){
-                        let armor_plus_str = await armor_get(tok);
-                        tok.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
+                        let armor_plus_str = await armor_get(tad);
+                        tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
                     }
                 }
                 
             } else {
-                console.log("Non-Humanoid");
+                //console.log("Non-Humanoid");
                 if (item.type === "weapon"){
+                    tad.items_updates = [];
                     let original_damage = item.data.data.original_damage;
-                    console.log("Original original_damage: " + original_damage);
+                    //console.log("Original original_damage: " + original_damage);
                     if (!original_damage){
-                        console.log("NO original_damage")
-                        tok.items_updates.push({
+                        //console.log("NO original_damage")
+                        tad.items_updates.push({
                             _id:item.id,
                             data: {
                                 original_damage: item.data.data.damage.parts[0][0]
@@ -374,53 +318,53 @@ async function main(opt){
                         });
                         original_damage = item.data.data.damage.parts[0][0];
                     } else {
-                        original_damage = item.data.data.damage.parts[0][0];
+                        //original_damage = item.data.data.damage.parts[0][0];
                     }
-                    console.log("Original Damage: " + original_damage);
+                    //console.log("Original Damage: " + original_damage);
 
                     let dPos = original_damage.indexOf("d");
                     let d = parseInt(original_damage.substr(0,dPos));
                     if (d > 0){
                         //console.log("D: " + d);
-                        let newD = d + Math.round(tok.cr_change_since_orig/2);
+                        let newD = d + Math.round(tad.cr_change_since_orig/2);
                         //console.log("newD: " + newD);
                         if (d + newD < 0){ newD = 1; }
                         let new_damage = newD + original_damage.substr(dPos,1000);
                         //console.log("new_damage: " + new_damage);
                         let damage_type = item.data.data.damage.parts[0][1]
                         let data = item.data.data;
-                        console.log(data);
+                        //console.log(data);
                         data.damage.parts[0][0] = new_damage;
                         data.damage.parts[0][1] = damage_type;
-                        tok.items_updates.push({
+                        tad.items_updates.push({
                             _id:item.id,
-                            data: data,
-                            name: "Fucking big fist"
+                            data: data
                         });
                     }
+                    await items_update(item, tad.items_updates);
                 }
             }
-            await items_update(item, tok.items_updates);
+            
         }
         
         //Add spells for spellcasters
-        if (tok.spellcaster_type){
-            for (let level = 1; level <= tok.max_spell_level; level++){
-                for (let spell of tok.template.spell_list[level]){
-                    tok.items_to_add_compendium.push(["dnd5e.spells", spell]);
+        if (tad.spellcaster_type){
+            for (let level = 1; level <= tad.max_spell_level; level++){
+                for (let spell of tad.template.spell_list[level]){
+                    tad.items_to_add_compendium.push(["dnd5e.spells", spell]);
                 }
             }
-            tok.data_to_update[AD+"details.spellLevel"] = tok.cr_new;
+            actorData_updates[AD+"details.spellLevel"] = tad.cr_new;
         }
-
+        
         //Add coins, treasure
-        tok.base_gp = Math.round((Math.round(tok.xp/10) * tok.social_status * tok.luck) + roll_simple(tok.adjusted_cr));
+        tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
         let gem_percent = 50 + roll_simple(50);
-        let gem_value = Math.round(tok.base_gp * (gem_percent/100));
-        let gem_qty = roll_simple(tok.cr_new);
-        let gp_value = tok.base_gp - gem_value;
+        let gem_value = Math.round(tad.base_gp * (gem_percent/100));
+        let gem_qty = roll_simple(tad.cr_new);
+        let gp_value = tad.base_gp - gem_value;
         if (gem_value > 0){
-            tok.items_to_add_raw.push({
+            tad.items_to_add_raw.push({
                 name: "Ancient Necklace",
                 type: "loot",
                 data: {
@@ -430,7 +374,7 @@ async function main(opt){
             });
         }
         if (gp_value > 0){
-            tok.items_to_add_raw.push({
+            tad.items_to_add_raw.push({
                 name: "Gold Pieces (" + gp_value + ")",
                 type: "loot",
                 data: {
@@ -440,23 +384,23 @@ async function main(opt){
             });
         }
 
-        //Do all updates that need done to this token
-        await item_types_remove(token, tok);                //Remove all selected item types
-        await items_add(token, tok);                        //Add all items
-        await items_equip_all(token);                       //Equip, identify, make proficient all items
-        await token.document.update(tok.data_to_update);    //Update all token data at once!
-        await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
-        
 
-        console.group("tok group");
-        console.log(tok);
-        console.log(token);
-        console.log(token.actor.data.items);
-        console.groupEnd();
+
+
+        await token.document.update(actorData_updates);
         
+        
+        await item_types_remove(token, tad);                //Remove all selected item types
+        await items_add(token, tad);                        //Add all items
+        await items_equip_all(token);                       //Equip, identify, make proficient all items
+        //await token.document.update(tok.data_to_update);    //Update all token data at once!
+        await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
+
+        console.log(tad);
+        console.log(original_actorData)
+        console.log(token.actor);
     }
     console.log("Finished processing tokens...");
-
 }
 
             
@@ -585,19 +529,19 @@ function is_humanoid(type){
         return false;
     }
 }
-async function item_types_remove(token, tok){
+async function item_types_remove(token, tad){
     for (let i of token.actor.items){
         console.log(i.name + " : " + i.type)
-        if (tok.item_types_to_delete.includes(i.type)){
-            tok.items_to_delete.push(i._id);
+        if (tad.item_types_to_delete.includes(i.type)){
+            tad.items_to_delete.push(i._id);
         }
     }
-    await items_delete(token, tok.items_to_delete)
+    await items_delete(token, tad.items_to_delete)
 }
 async function items_add(token, tok) {
-    console.log(token);
-    console.log(tok.items_to_add_compendium);
-    console.log(tok.items_to_add_raw);
+    //console.log(token);
+    //console.log(tok.items_to_add_compendium);
+    //console.log(tok.items_to_add_raw);
 
     //let entities = []
     for (let i of tok.items_to_add_compendium){
@@ -605,7 +549,7 @@ async function items_add(token, tok) {
         let index = await pack.getIndex();
         let entry = await index.find(e => e.name === i[1]);
         
-        console.log(entry)
+        //console.log(entry)
         
         let entity = await pack.getDocument(entry._id);
         //entities.push(entity.data.toObject());
@@ -614,7 +558,7 @@ async function items_add(token, tok) {
     //console.log(entities);
     //await token.actor.createEmbeddedDocuments("Item", entities);
     
-    console.log(tok);
+    //console.log(tok);
     await token.actor.createEmbeddedDocuments("Item", tok.items_to_add_raw);
 }
 async function items_delete(token, items){
@@ -760,11 +704,11 @@ function spell_level_get_max(cr){
     if (cr >16) l = 9;
     return l;
 }
-function social_status_get(token,tok){
+function social_status_get(token,tad){
     let roll = roll_simple(1000);
-    tok.social_status_before = roll;
+    tad.social_status_before = roll;
     roll += (token.actor.data.data.abilities.cha.mod * 20)
-    tok.social_status_after = roll;
+    tad.social_status_after = roll;
     switch(true){
         case (roll<5):   return 0.25; //1-4         4/1000   =  0.4%
         case (roll<21):  return 0.50; //5-20        16/1000  =  1.6%
@@ -776,9 +720,9 @@ function social_status_get(token,tok){
     }
 }
 
-async function template_choose(tok){
+async function template_choose(tad){
     let template = [];
-    let type = tok.opt.template_str;
+    let type = tad.opt.template_str;
     //                 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 
     //let armor_plus  = [0,0,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3];
     //let shield_plus = [0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3];
@@ -787,17 +731,17 @@ async function template_choose(tok){
     template.armor_plus  = 0;
     template.shield_plus = 0;
     template.weapon_plus = 0;
-    if (tok.adjusted_cr > 1){ template.armor_plus  = Math.round((tok.adjusted_cr /7)); }
-    if (tok.adjusted_cr > 6){ template.shield_plus = Math.round((tok.adjusted_cr /7)); }
-    if (tok.adjusted_cr > 4){ template.weapon_plus = Math.round((tok.adjusted_cr /7)); }
+    if (tad.adjusted_cr > 1){ template.armor_plus  = Math.round((tad.adjusted_cr /7)); }
+    if (tad.adjusted_cr > 6){ template.shield_plus = Math.round((tad.adjusted_cr /7)); }
+    if (tad.adjusted_cr > 4){ template.weapon_plus = Math.round((tad.adjusted_cr /7)); }
     
     //console.log(tok);
 
     //Even if "generic" was chosen, use some sense to figure out what kind of NPC we are dealing with
-    if (tok.is_humanoid){
+    if (tad.is_humanoid){
         //Figure out if npc can cast spells
-        if (tok.spellcaster_type){
-            if (tok.spellcaster_type == "wis"){
+        if (tad.spellcaster_type){
+            if (tad.spellcaster_type == "wis"){
                 template.class = "cleric";
             } else {
                 template.class = "wizard";
