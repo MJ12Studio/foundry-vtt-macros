@@ -341,7 +341,7 @@ async function main(opt){
                             data: data
                         });
                     }
-                    await items_update(item, tad.items_updates);
+                    await token.actor.updateEmbeddedDocuments("Item", tad.items_updates);
                 }
             }
             
@@ -384,12 +384,7 @@ async function main(opt){
             });
         }
 
-
-
-
         await token.document.update(actorData_updates);
-        
-        
         await item_types_remove(token, tad);                //Remove all selected item types
         await items_add(token, tad);                        //Add all items
         await items_equip_all(token);                       //Equip, identify, make proficient all items
@@ -402,12 +397,6 @@ async function main(opt){
     }
     console.log("Finished processing tokens...");
 }
-
-            
-
-            
-
-
         // Do they have a shield?
 
     
@@ -466,63 +455,10 @@ async function can_cast_spells(token){
     }
     return spellcasting;
 }
-async function cr_and_originals_get(tok, AD, TADD, opt){
-    //CR and originals
-    tok.cr = TADD.details.cr;
-    if (tok.cr < 1){ tok.cr = 1; }
-    tok.originals.cr = TADD.originals?.cr;
-    if (!tok.originals.cr){
-        tok.originals.cr = tok.cr;
-        tok.data_to_update[AD+"originals.cr"] =     tok.originals.cr;
-        tok.data_to_update[AD+"originals.cha"] =    TADD.abilities.cha.value;
-        tok.data_to_update[AD+"originals.con"] =    TADD.abilities.con.value;
-        tok.data_to_update[AD+"originals.dex"] =    TADD.abilities.dex.value;
-        tok.data_to_update[AD+"originals.int"] =    TADD.abilities.int.value;
-        tok.data_to_update[AD+"originals.str"] =    TADD.abilities.str.value;
-        tok.data_to_update[AD+"originals.wis"] =    TADD.abilities.wis.value;
-        tok.data_to_update[AD+"originals.burrow"] = TADD.attributes.movement.burrow;
-        tok.data_to_update[AD+"originals.climb"] =  TADD.attributes.movement.climb;
-        tok.data_to_update[AD+"originals.fly"] =    TADD.attributes.movement.fly;
-        tok.data_to_update[AD+"originals.swim"] =   TADD.attributes.movement.swim;
-        tok.data_to_update[AD+"originals.walk"] =   TADD.attributes.movement.walk;
-
-        tok.abilities.cha = TADD.abilities.cha.value;
-        tok.abilities.con = TADD.abilities.con.value;
-        tok.abilities.dex = TADD.abilities.dex.value;
-        tok.abilities.int = TADD.abilities.int.value;
-        tok.abilities.str = TADD.abilities.str.value;
-        tok.abilities.wis = TADD.abilities.wis.value;
-        
-        tok.movement.burrow = TADD.attributes.movement.burrow;
-        tok.movement.climb =  TADD.attributes.movement.climb;
-        tok.movement.fly=     TADD.attributes.movement.fly;
-        tok.movement.swim =   TADD.attributes.movement.swim;
-        tok.movement.walk =   TADD.attributes.movement.walk;
-    } else {
-        tok.abilities.cha = TADD.originals.cha;
-        tok.abilities.con = TADD.originals.con;
-        tok.abilities.dex = TADD.originals.dex;
-        tok.abilities.int = TADD.originals.int;
-        tok.abilities.str = TADD.originals.str;
-        tok.abilities.wis = TADD.originals.wis;
-        
-        tok.movement.burrow = TADD.originals.burrow;
-        tok.movement.climb =  TADD.originals.climb;
-        tok.movement.fly=     TADD.originals.fly;
-        tok.movement.swim =   TADD.originals.swim;
-        tok.movement.walk =   TADD.originals.walk;
-    }
-    tok.cr_new = tok.cr + opt.cr_change;
-    if (tok.cr_new < 1){ tok.cr_new = 1; }
-    tok.data_to_update[AD+"details.cr"] = tok.cr_new;
-    tok.cr_change_since_orig = tok.cr_new - tok.originals.cr;
-}
 function gender_get(){
     return ["Male","Female"].random();
 }
 function is_humanoid(type){
-    //console.log("is_humanoid: " + type);
-    //if (["celestial","fey","fiend","giant","humanoid"].includes(type.toLowerCase()) || type.indexOf("umanoid")> -1){
     if (["celestial","fey","fiend","giant","humanoid"].includes(type.toLowerCase())){
         return true;
     } else {
@@ -531,7 +467,7 @@ function is_humanoid(type){
 }
 async function item_types_remove(token, tad){
     for (let i of token.actor.items){
-        console.log(i.name + " : " + i.type)
+        //console.log(i.name + " : " + i.type)
         if (tad.item_types_to_delete.includes(i.type)){
             tad.items_to_delete.push(i._id);
         }
@@ -539,33 +475,18 @@ async function item_types_remove(token, tad){
     await items_delete(token, tad.items_to_delete)
 }
 async function items_add(token, tok) {
-    //console.log(token);
-    //console.log(tok.items_to_add_compendium);
-    //console.log(tok.items_to_add_raw);
-
-    //let entities = []
     for (let i of tok.items_to_add_compendium){
         let pack = await game.packs.get(i[0]);
         let index = await pack.getIndex();
         let entry = await index.find(e => e.name === i[1]);
-        
-        //console.log(entry)
-        
         let entity = await pack.getDocument(entry._id);
-        //entities.push(entity.data.toObject());
         tok.items_to_add_raw.push(entity.data.toObject());
     }
-    //console.log(entities);
-    //await token.actor.createEmbeddedDocuments("Item", entities);
-    
-    //console.log(tok);
     await token.actor.createEmbeddedDocuments("Item", tok.items_to_add_raw);
 }
 async function items_delete(token, items){
     await token.actor.deleteEmbeddedDocuments( "Item", items );
 }
-//token.actor.deleteEmbeddedDocuments("ActiveEffect", [effect.id]);
-
 async function items_equip_all(token){
     for (let i of token.actor.items){
         if (i.type == "equipment" || i.type == "weapon"){
@@ -573,7 +494,6 @@ async function items_equip_all(token){
         }
     }
 }
-
 async function item_equipped_identified_proficient(token, item){
     await token.actor.updateEmbeddedDocuments("Item", [{
         _id:item.id, 
@@ -585,12 +505,10 @@ async function item_equipped_identified_proficient(token, item){
         }]
     );
 }
-
 async function items_update(token, updates){
     console.log(updates);
     await token.actor.updateEmbeddedDocuments("Item", updates);
 }
-
 function npc_count_get(){
     let npc_count = 0;
     for (let t of canvas.tokens.controlled){
@@ -601,7 +519,6 @@ function npc_count_get(){
 function party_level_average_get(){
     let party_count = 0;
     let party_level_total = 0;
-    //console.log(canvas.tokens.placeables)
     for (let t of canvas.tokens.placeables){
         if (t.actor){
             let a = game.actors.get(t.actor.id);
@@ -617,7 +534,6 @@ function party_level_average_get(){
     }
     return Math.round(party_level_total / party_count);
 }
-
 function roll_bell_curve_1000(){
     let roll = roll_simple(1000);
     switch(true){
@@ -630,7 +546,6 @@ function roll_bell_curve_1000(){
         default:         return 4.00; //997-1000    4/1000   =  0.4%
     }
 }
-
 function roll_simple(d){
     return Math.floor(Math.random() * d) + 1
 }
@@ -643,7 +558,6 @@ function roll_no1_no2(qty, d){
     }
     return total;
 }
-
 async function spellslots_get(tok){
     let spellslots = [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -690,7 +604,6 @@ async function spellslots_get(tok){
     */
     return spellslots[tok.cr_new];
 }
-
 function spell_level_get_max(cr){
     let l = 0;
     if (cr >0) l = 1;
@@ -719,7 +632,6 @@ function social_status_get(token,tad){
         default:         return 4.00; //997-1000    4/1000   =  0.4%
     }
 }
-
 async function template_choose(tad){
     let template = [];
     let type = tad.opt.template_str;
@@ -816,11 +728,9 @@ async function template_choose(tad){
     //console.log(template);
     return template;
 }
-
 async function token_update(token, tok){
     await token.document.update(tok.data_to_update);
 }
-
 function treasure_generate(tok){
     //Decide how to break up remaining wealth into different items
     //  Coins vs misc
@@ -829,7 +739,6 @@ function treasure_generate(tok){
     
     //Return items
 }
-
 async function weapon_melee_get(tok){
     let weapon_m = [];
     weapon_m.push("Dagger");
@@ -1017,7 +926,6 @@ function dialog_start(){
                 <hr>
     */
 }
-
 function log(group, logStr){
     console.group(group);
     console.log(logStr);
@@ -1026,11 +934,8 @@ function log(group, logStr){
 function l(logStr){
     console.log(logStr);
 }
-
 // Javascript Extensions:
 Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
-
-
 function get_test(tok){
     tok.get_test = true;
 }
