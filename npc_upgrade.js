@@ -15,14 +15,19 @@
         * Templates
         * Fix AC base value
         * Scale Non-Humanoid damage
-
+        * Implemented constants for easy tweaking of game settings
+        * Add a button to just generate loot
+        * Multiattacks for Humanoid NPCs
+        * Shields
+        * Pluses for Armor and Weapons needs tweaked to be more fair/random
         
         =============== Questions Unanswered ===============
         Q: Can we access external javascript data files (github, bitbucket) for lists, arrays?
         Q: Do we want to make our money on this project? OR drive traffic to something else, like adventure modules?
             * Adventure modules could be designed to work with NPC Adjust.
             * Maybe instead of Patreon for this we just sell Adventure modules that auto-scale
-        
+        Q: Can we have [semi-]permanent settings for our macros?
+
         
         =============== Questions Answered ===============
         Q: How do we get our macro accepted to the Community Macros?
@@ -40,40 +45,28 @@
             __ Should we include some character traits, disposition, history, etc
                 for flavor and DM use?
 
-        
+        * Add a chat message to indicate token was scaled
 
         *** Add a help button on the start dialog to popup a help dialog.
     
-        *** Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
+        * Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
 
-        * Loot that is carried on the NPC
 
-            * Add a button to just generate loot
-            
-            * Misc Magic Items
 
-        For Humanoid NPC
-            *+Pluses for Armor and Weapons needs tweaked to be more fair/random
-                
-            * Multi-attacks (Fighters get theirs at level 3)
-                *Add or Upgrade
-                If humanoid AND a fighter-template then:
-                    * At 3rd = 2 attacks
-                    * At 12th = 3 attacks
-                Spellcasters get no multi-attacks
-            * Do we add a hierarchy
-        For Non-Humanoid NPC
-            
-            *** Don't mess with their multi-attacks and their weapons
-                * Scale damage is OK, but don't clear them and try to add new ones
-            
+
+        * Non-Human NPCs            
             Intelligent
-                
-                
+                vs
             Non-Intelligent        
                 No spells
-                
-    
+
+      * Add debug option / info
+      
+      
+      ================ Tweaking for release ==========================
+      
+      
+
 ***** Notes to users:
     * Upgrading an NPC with less that CR 1 by 0 will make the NPC CR 1.
     
@@ -90,6 +83,10 @@
     ===============================
     Wish list for version 2
     ===============================
+    
+    * Misc Magic Items
+        Compendium necessary?
+
     Humanoids, Non-humanoids
         *Features - build in some logic for who gets what
             Auras:
@@ -137,6 +134,10 @@
     Add more randomness to HP
     
     ======================= Additional Macros/Modules ==================================
+    
+    * Simple macro to work with selected tokens
+        * Show info, clear items, etc.
+    
     * Resurrect entire scene
         * Give everyone treasure/loot
         
@@ -153,18 +154,30 @@
 
 */
 
-dialog_start();
+//Constants for tweaking scale settings
+const ABILITY_LEVEL_PER_PLUS = 3;
+const GEM_BASE_PERCENT = 50;
+const LEVEL_PER_PLUS_ARMOR = 7;
+const LEVEL_PER_PLUS_SHIELD = 7;
+const LEVEL_PER_PLUS_WEAPON = 7;
+const NPC_HIT_DIE = 12;
 
+if (canvas.tokens.controlled.length == 0){ alert("Please select at least one NPC!"); return;}
+
+dialog_start();
 async function main(opt){
     opt.npc_count = await npc_count_get();
     opt.party_level_average = await party_level_average_get()
 
+
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         if (token.actor.type != "npc"){ continue; } //Skip it if it's not an npc
 
-        let TADD = token.actor.data.data;           //Used for READING data from token. Foundry Data
-        let AD   = "actorData.data.";               //Used for WRITING data to token. Foundry Data
-        let tad  = [];                              //Temp array of variables for non-system data
+        let AD   = "actorData.data.";                       //Used for WRITING data to token. Foundry Data
+        let TADD = token.actor.data.data;                   //Used for READING data from token. Foundry Data
+
+        //Setup temp array for processing current token
+        let tad  = [];
         tad.item_types_to_delete = [];
         tad.items_to_add_compendium = [];
         tad.items_to_add_raw = [];
@@ -172,26 +185,29 @@ async function main(opt){
         tad.movement = [];
         tad.opt = opt;
 
-        //Get/Set original data
+        //Get/set original data
         let original_actorData = TADD.original_actorData;
         let actorData_updates = [];
         if (!original_actorData){
             original_actorData = await token.actor.data;
             actorData_updates["actorData.data.original_actorData"] = original_actorData;
         }
-        
+
         //Scale basic token info
+        console.log("opt.cr_change: " + tad.opt.cr_change);
+        console.log("original cr: " + original_actorData.data.details.cr)
+        
         tad.cr = TADD.details.cr;
         if (tad.cr < 1){ tad.cr = 1; }
-        tad.cr_new = tad.cr + opt.cr_change;
+        tad.cr_new = tad.cr + tad.opt.cr_change;
         if (tad.cr_new < 1){ tad.cr_new = 1; }
         actorData_updates[AD+"details.cr"] = tad.cr_new;
         tad.cr_change_since_orig = Math.round(tad.cr_new - original_actorData.data.details.cr);
 
         //Misc Token info
-        tad.alignment = TADD.details.alignment;                       //Alignment
+        tad.alignment = TADD.details.alignment;
         tad.gender = gender_get();
-        tad.race = TADD.details.race
+        tad.race = TADD.details.race;
         tad.is_humanoid = is_humanoid(TADD.details.type.value);
         tad.max_spell_level = spell_level_get_max(tad.cr_new);
         tad.spellcaster_type = TADD.attributes.spellcasting;
@@ -207,8 +223,11 @@ async function main(opt){
 
         //Abilities Adjust
         if (tad.opt.adjust_abilities){
+            tad.con = original_actorData.data.abilities.con.value;
             for (let ability of tad.template.abilities){
-                actorData_updates[AD+"abilities." + ability + ".value"] = original_actorData.data.abilities[ability].value + Math.round(tad.cr_change_since_orig/3);
+                let new_value = original_actorData.data.abilities[ability].value + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
+                actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
+                if (ability == "con"){ tad.con = new_value; }
             }
         }
 
@@ -218,20 +237,19 @@ async function main(opt){
         //HP Adjust
         if (opt.adjust_hp){
             let hp = TADD.attributes.hp.max;
-            let con = original_actorData.data.abilities.con.value + Math.round(tad.cr_change_since_orig/3);
-            tad.hp = (tad.cr_new * 12) + (Math.round((con - 10) / 2) * tad.cr_new);
+            tad.hp = (tad.cr_new * NPC_HIT_DIE) + (parseInt((tad.con - 10) / 2) * tad.cr_new);
             actorData_updates[AD+"attributes.hp.max"] = tad.hp;
         }
 
         //Do some things based on humanoid/non-humanoid
-        tad.item_types_to_delete.push("loot");
         if (!tad.is_humanoid){
             //Movement Adjust: Adjust up or down by 1 foot per CR 
             for (let m of ["burrow","climb","fly","swim","walk"]){
-                let cur_m = TADD.attributes.movement[m];
+                console.log(original_actorData);
+                let cur_m = original_actorData.data.attributes.movement[m];
                 if (cur_m > 0){
                     tad.movement[m] = Math.round(cur_m + tad.cr_new);
-                    actorData_updates[AD+"attributes.hp.movement." + m] = tad.movement[m];
+                    actorData_updates[AD+"attributes.movement." + m] = tad.movement[m];
                 }
             }
         } else {
@@ -242,6 +260,8 @@ async function main(opt){
         }
 
         //Items Adjust
+        tad.has_multiattack = false;
+        tad.has_shield = false;
         for (let item of token.actor.items){
             
             //console.log("item: " + item.name);
@@ -253,8 +273,10 @@ async function main(opt){
                 if (item.type === "weapon"){
                     //console.log("   weapon")
                     let new_name = "";
-                    if (tad.template.weapon_plus > 0){
-                        new_name = " +" + tad.template.weapon_plus;                        
+                    let weapon_plus = await item_plus_get(tad);
+                    l("Weapon_plus: " + weapon_plus);
+                    if (weapon_plus > 0){
+                        new_name = " +" + weapon_plus;                        
                     }
                     let weapon = "";
                     if (item.data.data.properties.two){
@@ -288,15 +310,31 @@ async function main(opt){
                             let n = tad.template.weapons_1_handed.length;
                             let r = roll_simple(n)-1;
                             weapon = tad.template.weapons_1_handed[r];                            
+                            
+                            //Add a shield?
+                            if (tad.template.class == "Fighter"){
+                                tad.has_shield = true;
+                            }
+                            
+                            
                         }
-
                     }
                     new_name = weapon + new_name;
                     //console.log("Trying to add weapon: " + new_name);
                     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
+                } else if (item.type === "feat"){
+                    if (item.name == "Multiattack"){
+                        tad.has_multiattack = true;
+                    }
+                    if (item.name.indexOf("Multiattack (") > -1){
+                        //Remove our versions of Multiattacks
+                        //console.log(item);
+                        await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
+                    }
                 } else {
-                    //log("Armor", item.data.data.armor)
-                    if (item.data.data.armor){
+                    console.log(item);
+                    log("Armor", item.data.data.armor)
+                    if (item.data.data.armor && !item.name.indexOf("Shield")){
                         let armor_plus_str = await armor_get(tad);
                         tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
                     }
@@ -347,6 +385,48 @@ async function main(opt){
             
         }
         
+        //Has Shield?
+        if (tad.has_shield){
+            let shield_plus = await item_plus_get(tad);
+            l("shield_plus: " + shield_plus);
+            if (shield_plus > 0){
+                tad.shield_name = "Shield +" + shield_plus;
+            } else {
+                tad.shield_name = "Shield";
+            }
+            tad.items_to_add_compendium.push(["dnd5e.items", tad.shield_name])
+        }
+
+        //Does multi-Attack need added?
+        if (tad.is_humanoid){
+            if (!tad.has_multiattack){
+                if (tad.cr_new > 2){
+                    if (tad.cr_new > 11){
+                        tad.items_to_add_raw.push({
+                            name: "Multiattack (3 Attacks)",
+                            type: "feat",
+                            data: {
+                                description: {
+                                    value: "The NPC gets 3 melee attacks."
+                                }
+                            }
+                        });
+                    } else {
+                        tad.items_to_add_raw.push({
+                            name: "Multiattack (2 Attacks)",
+                            type: "feat",
+                            data: {
+                                description: {
+                                    value: "The NPC gets 2 melee attacks."
+                                }
+                            }
+                        });
+                        
+                    }
+                }
+            }
+        }
+        
         //Add spells for spellcasters
         if (tad.spellcaster_type){
             for (let level = 1; level <= tad.max_spell_level; level++){
@@ -358,30 +438,9 @@ async function main(opt){
         }
         
         //Add coins, treasure
-        tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
-        let gem_percent = 50 + roll_simple(50);
-        let gem_value = Math.round(tad.base_gp * (gem_percent/100));
-        let gem_qty = roll_simple(tad.cr_new);
-        let gp_value = tad.base_gp - gem_value;
-        if (gem_value > 0){
-            tad.items_to_add_raw.push({
-                name: "Ancient Necklace",
-                type: "loot",
-                data: {
-                    quantity: gem_qty,
-                    price: gem_value,
-                }
-            });
-        }
-        if (gp_value > 0){
-            tad.items_to_add_raw.push({
-                name: "Gold Pieces (" + gp_value + ")",
-                type: "loot",
-                data: {
-                    quantity: gp_value,
-                    price: gp_value,
-                },
-            });
+        if (tad.opt.adjust_loot){
+            tad.item_types_to_delete.push("loot");
+            loot_get(tad);
         }
 
         await token.document.update(actorData_updates);
@@ -420,7 +479,7 @@ async function main(opt){
 /*=================================================================
     Functions
   =================================================================*/
-async function armor_get(tok){
+async function armor_get(tad){
     let armor = [];
     armor.push("None");                     // 10 0
     armor.push("Padded Armor");             // 11 1
@@ -436,24 +495,20 @@ async function armor_get(tok){
     armor.push("Splint Armor");             // 17 11
     armor.push("Plate Armor");              // 18 12
     let armor_number = 0;
-    if (tok.adjusted_cr > 12){ tok.adjusted_cr = 12; }
-    if (tok.adjusted_cr > 0 && tok.adjusted_cr < 5){ armor_number = roll_simple(4); }
-    if (tok.adjusted_cr > 4 && tok.adjusted_cr < 9){ armor_number = roll_simple(4) + 4; }
-    if (tok.adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
-    if (tok.template.armor_plus > 0){
-        return armor[armor_number] + " +" + tok.template.armor_plus;
+    
+    //console.log(tad);
+    if (tad.adjusted_cr > 12){ tad.adjusted_cr = 12; }
+    if (tad.adjusted_cr > 0 && tad.adjusted_cr < 5){ armor_number = roll_simple(4); }
+    if (tad.adjusted_cr > 4 && tad.adjusted_cr < 10){ armor_number = roll_simple(4) + 4; }
+    if (tad.adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
+    
+    let armor_plus = await item_plus_get(tad);
+    l("armor_plus: " + armor_plus);
+    if (armor_plus > 0){
+        return armor[armor_number] + " +" + armor_plus;
     } else {
         return armor[armor_number];
     }
-}
-async function can_cast_spells(token){
-    let spellcasting = false;
-    for (let i of token.actor.items){
-        if (i.data.name == "Spellcasting"){
-            spellcasting = true;
-        }
-    }
-    return spellcasting;
 }
 function gender_get(){
     return ["Male","Female"].random();
@@ -465,6 +520,27 @@ function is_humanoid(type){
         return false;
     }
 }
+async function item_plus_get(tad){
+    //l("tad.adjusted_cr: " + tad.adjusted_cr);
+    let roll = roll_simple(100);
+    //l(" Roll = " + roll)
+    switch(true){
+        case (tad.adjusted_cr < 8):
+            let percent_a = Math.round((tad.adjusted_cr / 7) * 100);
+            //l(" percent_a: " + percent_a);
+            if(roll <= percent_a){ return 1; } else { return 0; }
+            break;
+        case (tad.adjusted_cr < 15):
+            let percent_s = Math.round(((tad.adjusted_cr - 7) / 7) * 100);
+            //l(" percent_s: " + percent_s);
+            if(roll <= percent_s){ return 2; } else { return (roll_simple(2)-1); }
+            break;
+        default:
+            let percent_w = Math.round(((tad.adjusted_cr - 14) / 6) * 100);
+            //l(" percent_w: " + percent_w);
+            if(roll <= percent_w){ return 3; } else { return (roll_simple(3)-1); }
+    }
+}
 async function item_types_remove(token, tad){
     for (let i of token.actor.items){
         //console.log(i.name + " : " + i.type)
@@ -474,15 +550,16 @@ async function item_types_remove(token, tad){
     }
     await items_delete(token, tad.items_to_delete)
 }
-async function items_add(token, tok) {
-    for (let i of tok.items_to_add_compendium){
+async function items_add(token, tad) {
+    console.log(tad.items_to_add_compendium)
+    for (let i of tad.items_to_add_compendium){
         let pack = await game.packs.get(i[0]);
         let index = await pack.getIndex();
         let entry = await index.find(e => e.name === i[1]);
         let entity = await pack.getDocument(entry._id);
-        tok.items_to_add_raw.push(entity.data.toObject());
+        tad.items_to_add_raw.push(entity.data.toObject());
     }
-    await token.actor.createEmbeddedDocuments("Item", tok.items_to_add_raw);
+    await token.actor.createEmbeddedDocuments("Item", tad.items_to_add_raw);
 }
 async function items_delete(token, items){
     await token.actor.deleteEmbeddedDocuments( "Item", items );
@@ -508,6 +585,33 @@ async function item_equipped_identified_proficient(token, item){
 async function items_update(token, updates){
     console.log(updates);
     await token.actor.updateEmbeddedDocuments("Item", updates);
+}
+async function loot_get(tad){
+    tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
+    let gem_percent = GEM_BASE_PERCENT + roll_simple((100 - GEM_BASE_PERCENT));
+    let gem_value = Math.round(tad.base_gp * (gem_percent/100));
+    let gem_qty = roll_simple(tad.cr_new);
+    let gp_value = tad.base_gp - gem_value;
+    if (gem_value > 0){
+        tad.items_to_add_raw.push({
+            name: "Ancient Necklace",
+            type: "loot",
+            data: {
+                quantity: gem_qty,
+                price: gem_value,
+            }
+        });
+    }
+    if (gp_value > 0){
+        tad.items_to_add_raw.push({
+            name: "Gold Pieces (" + gp_value + ")",
+            type: "loot",
+            data: {
+                quantity: gp_value,
+                price: gp_value,
+            },
+        });
+    }
 }
 function npc_count_get(){
     let npc_count = 0;
@@ -558,52 +662,6 @@ function roll_no1_no2(qty, d){
     }
     return total;
 }
-async function spellslots_get(tok){
-    let spellslots = [
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [1, 2, 0, 0, 0, 0, 0, 0, 0, 0],
-      [1, 3, 0, 0, 0, 0, 0, 0, 0, 0],
-      [1, 4, 2, 0, 0, 0, 0, 0, 0, 0],
-      [1, 4, 3, 0, 0, 0, 0, 0, 0, 0],
-      [1, 4, 3, 2, 0, 0, 0, 0, 0, 0],
-      [1, 4, 3, 3, 0, 0, 0, 0, 0, 0],
-      [1, 4, 3, 3, 1, 0, 0, 0, 0, 0],
-      [1, 4, 3, 3, 2, 0, 0, 0, 0, 0],
-      [1, 4, 3, 3, 3, 1, 0, 0, 0, 0],
-      [1, 4, 3, 3, 3, 2, 0, 0, 0, 0],
-      [1, 4, 3, 3, 3, 2, 1, 0, 0, 0],
-      [1, 4, 3, 3, 3, 2, 1, 0, 0, 0],
-      [1, 4, 3, 3, 3, 2, 1, 1, 0, 0],
-      [1, 4, 3, 3, 3, 2, 1, 1, 0, 0],
-      [1, 4, 3, 3, 3, 2, 1, 1, 1, 0],
-      [1, 4, 3, 3, 3, 2, 1, 1, 1, 0],
-      [1, 4, 3, 3, 3, 2, 1, 1, 1, 1],
-      [1, 4, 3, 3, 3, 3, 1, 1, 1, 1],
-      [1, 4, 3, 3, 3, 3, 2, 1, 1, 1],
-      [1, 4, 3, 3, 3, 3, 2, 2, 1, 1]
-    ];
-
-    //Add all spells per level
-    /*
-    let all_spells = [];
-    let cr = tok.cr_new;
-    if (cr > 20){ cr = 20;};
-    for (let i=0; i<10; i++){
-        let spell_count = spell_count_by_level[cr][i];
-        console.log("i: " + i + ", Spell_Count: " + spell_count)
-        if (spell_count > 0){
-            let spell_list = tok.template.spell_list[i];
-            //console.log(spell_list)
-            for (let spell of spell_list){
-                //console.log(spell)
-                //all_spells.push(spell)
-                all_spells.push(spell);
-            }
-        }
-    }
-    */
-    return spellslots[tok.cr_new];
-}
 function spell_level_get_max(cr){
     let l = 0;
     if (cr >0) l = 1;
@@ -635,17 +693,21 @@ function social_status_get(token,tad){
 async function template_choose(tad){
     let template = [];
     let type = tad.opt.template_str;
-    //                 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 
-    //let armor_plus  = [0,0,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3];
-    //let shield_plus = [0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3];
-    //let weapon_plus = [0,0,0,0,1,1,1,1,2,2,2,2,2,2,2,2,2,2,3,3,3];
+    
 
+    
+    /*
     template.armor_plus  = 0;
     template.shield_plus = 0;
     template.weapon_plus = 0;
-    if (tad.adjusted_cr > 1){ template.armor_plus  = Math.round((tad.adjusted_cr /7)); }
-    if (tad.adjusted_cr > 6){ template.shield_plus = Math.round((tad.adjusted_cr /7)); }
-    if (tad.adjusted_cr > 4){ template.weapon_plus = Math.round((tad.adjusted_cr /7)); }
+    if (tad.adjusted_cr > 1){ template.armor_plus  = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_ARMOR)); }
+    if (tad.adjusted_cr > 6){ template.shield_plus = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_SHIELD)); }
+    if (tad.adjusted_cr > 4){ template.weapon_plus = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_WEAPON)); }
+
+    if (template.armor_plus > 3){ template.armor_plus = 3; }
+    if (template.shield_plus > 3){ template.shield_plus = 3; }
+    if (template.weapon_plus > 3){ template.weapon_plus = 3; }
+    */
     
     //console.log(tok);
 
@@ -730,14 +792,6 @@ async function template_choose(tad){
 }
 async function token_update(token, tok){
     await token.document.update(tok.data_to_update);
-}
-function treasure_generate(tok){
-    //Decide how to break up remaining wealth into different items
-    //  Coins vs misc
-    
-    let items = [];
-    
-    //Return items
 }
 async function weapon_melee_get(tok){
     let weapon_m = [];
@@ -860,11 +914,12 @@ function dialog_start(){
 
                 <center><div>NPC Adjustments</div></center>
                 <div class="form-group">    <label>Abilities:</label>     <input id='adjust_abilities' type='checkbox' checked /></div>
-                <!--<div class="form-group">    <label>Age:</label>           <input id='adjust_age' type='checkbox' checked /></div>-->
+                <!--<div class="form-group">    <label>Age:</label>       <input id='adjust_age' type='checkbox' checked /></div>-->
                 <div class="form-group">    <label>Armor:</label>         <input id='adjust_armor' type='checkbox' checked /></div>
                 <div class="form-group">    <label>HP:</label>            <input id='adjust_hp' type='checkbox' checked /></div>
+                <div class="form-group">    <label>Loot:</label>          <input id='adjust_loot' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Movement:</label>      <input id='adjust_movement' type='checkbox' checked /></div>
-                <!--<div class="form-group">    <label>Size:</label>          <input id='adjust_size' type='checkbox' checked /></div>-->
+                <!--<div class="form-group">    <label>Size:</label>      <input id='adjust_size' type='checkbox' checked /></div>-->
                 <div class="form-group">    <label>Spells:</label>        <input id='adjust_spells' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Weapons:</label>       <input id='adjust_weapons' type='checkbox' checked /></div>
                 <hr>
@@ -876,9 +931,9 @@ function dialog_start(){
             </form>
         `,
       buttons: {
-        yes: {
+        upgrade: {
           icon: "<i class='fas fa-check'></i>",
-          label: "Upgrade",
+          label: "Full Upgrade",
           callback: () => {
               //Get all options from Form
               let opt = [];
@@ -895,6 +950,7 @@ function dialog_start(){
               //opt.adjust_ac        = document.getElementById("adjust_ac").checked
               opt.adjust_armor     = document.getElementById("adjust_armor").checked
               opt.adjust_hp        = document.getElementById("adjust_hp").checked
+              opt.adjust_loot      = document.getElementById("adjust_loot").checked
               opt.adjust_movement  = document.getElementById("adjust_movement").checked
               opt.adjust_spells    = document.getElementById("adjust_spells").checked
               opt.adjust_weapons   = document.getElementById("adjust_weapons").checked
@@ -907,24 +963,32 @@ function dialog_start(){
               main(opt);
           }
         },
-        no: {
+        loot: {
+            icon: "<i class='fas fa-check'></i>",
+            label: "Loot Only",
+            callback: () => {
+                let opt = [];
+                opt.cr_change = 0;
+                opt.adjust_armor = false;
+                opt.adjust_hp = false;
+                opt.adjust_loot = true;
+                opt.adjust_movement = false;
+                opt.adjust_spells = false
+                opt.adjust_weapons = false;
+                opt.clear_armor = false;
+                opt.clear_features = false;
+                opt.clear_spells = false;
+                opt.clear_weapons = false;
+                main(opt);
+            }
+        },
+        cancel: {
           icon: "<i class='fas fa-times'></i>",
           label: "Cancel"
         },
       },
       default: "yes"
     }).render(true);
-    
-    
-    /* Template Chooser
-                    <div class="form-group">
-                    <label>Template:</label>
-                    <select id="npc_template" name="npc_template">
-                        ` + t_html + `
-                    </select>
-                </div>
-                <hr>
-    */
 }
 function log(group, logStr){
     console.group(group);
@@ -936,6 +1000,3 @@ function l(logStr){
 }
 // Javascript Extensions:
 Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
-function get_test(tok){
-    tok.get_test = true;
-}
