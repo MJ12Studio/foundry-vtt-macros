@@ -38,6 +38,9 @@
             A: Yes... See Gold and treasure
         
         =============== To-Do's ===============
+        
+        * Add armor to NPC with no armor
+        
 
             == Narrative / Biography ==    
             __ Should we choose Gender?  May help choose things like jewelry
@@ -169,7 +172,6 @@ async function main(opt){
     opt.npc_count = await npc_count_get();
     opt.party_level_average = await party_level_average_get()
 
-
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         if (token.actor.type != "npc"){ continue; } //Skip it if it's not an npc
 
@@ -194,9 +196,6 @@ async function main(opt){
         }
 
         //Scale basic token info
-        console.log("opt.cr_change: " + tad.opt.cr_change);
-        console.log("original cr: " + original_actorData.data.details.cr)
-        
         tad.cr = TADD.details.cr;
         if (tad.cr < 1){ tad.cr = 1; }
         tad.cr_new = tad.cr + tad.opt.cr_change;
@@ -263,10 +262,6 @@ async function main(opt){
         tad.has_multiattack = false;
         tad.has_shield = false;
         for (let item of token.actor.items){
-            
-            //console.log("item: " + item.name);
-            //console.log(item);
-            //console.log("is_humanoid: " + tok.is_humanoid)
             if (tad.is_humanoid){
                 //console.log("   isHumanoid!");
                 //Weapons / Armor
@@ -355,8 +350,6 @@ async function main(opt){
                             }
                         });
                         original_damage = item.data.data.damage.parts[0][0];
-                    } else {
-                        //original_damage = item.data.data.damage.parts[0][0];
                     }
                     //console.log("Original Damage: " + original_damage);
 
@@ -456,25 +449,6 @@ async function main(opt){
     }
     console.log("Finished processing tokens...");
 }
-        // Do they have a shield?
-
-    
-        
-        // Maybe later =============================================
-        //Upgrade weapons
-        //    Club -> Mace -> Great Mace
-        
-        
-        
-
-
-        //Add some languages?
-        
-        //Add special senses?
-
-
-        //Adjust Age
-
 
 /*=================================================================
     Functions
@@ -514,7 +488,7 @@ function gender_get(){
     return ["Male","Female"].random();
 }
 function is_humanoid(type){
-    if (["celestial","fey","fiend","giant","humanoid"].includes(type.toLowerCase())){
+    if (["celestial","fey","giant","humanoid"].includes(type.toLowerCase())){
         return true;
     } else {
         return false;
@@ -693,23 +667,6 @@ function social_status_get(token,tad){
 async function template_choose(tad){
     let template = [];
     let type = tad.opt.template_str;
-    
-
-    
-    /*
-    template.armor_plus  = 0;
-    template.shield_plus = 0;
-    template.weapon_plus = 0;
-    if (tad.adjusted_cr > 1){ template.armor_plus  = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_ARMOR)); }
-    if (tad.adjusted_cr > 6){ template.shield_plus = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_SHIELD)); }
-    if (tad.adjusted_cr > 4){ template.weapon_plus = Math.round((tad.adjusted_cr /LEVEL_PER_PLUS_WEAPON)); }
-
-    if (template.armor_plus > 3){ template.armor_plus = 3; }
-    if (template.shield_plus > 3){ template.shield_plus = 3; }
-    if (template.weapon_plus > 3){ template.weapon_plus = 3; }
-    */
-    
-    //console.log(tok);
 
     //Even if "generic" was chosen, use some sense to figure out what kind of NPC we are dealing with
     if (tad.is_humanoid){
@@ -727,10 +684,8 @@ async function template_choose(tad){
         //Non-Humanoid
         template.class = "non-humanoid";
     }
-    
-    console.log("Template class: " + template.class);
-    
-    
+    //console.log("Template class: " + template.class);
+
     switch(template.class){
         case "cleric":
             template.class = "Cleric";
