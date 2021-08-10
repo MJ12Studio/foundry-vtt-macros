@@ -19,7 +19,9 @@
         * Add a button to just generate loot
         * Multiattacks for Humanoid NPCs
         * Shields
-        * Pluses for Armor and Weapons needs tweaked to be more fair/random
+        * Pluses for Armor and Weapons were tweaked to be more fair/random
+        * Add armor to Humanoid NPC with no armor
+        * Add weapon to Humanoid NPC with no weapon
         
         =============== Questions Unanswered ===============
         Q: Can we access external javascript data files (github, bitbucket) for lists, arrays?
@@ -28,7 +30,6 @@
             * Maybe instead of Patreon for this we just sell Adventure modules that auto-scale
         Q: Can we have [semi-]permanent settings for our macros?
 
-        
         =============== Questions Answered ===============
         Q: How do we get our macro accepted to the Community Macros?
             A: Looks like we need no special permission, we just add it here: https://github.com/foundry-vtt-community/macros
@@ -36,11 +37,17 @@
             A: Yes. Tested with GitHub.
         Q: Can we create an item on the fly without a compendium
             A: Yes... See Gold and treasure
+        Q: Can we have embedded images in our items using the "data:image" tag?
+            A: Yes, but is it worth it? Maybe only for SVG images
+        
+        let img = "<data:image asdadopdhasdgfigu;wqeilfr reoi8uawefoadsfoivuihafdvnio>";
         
         =============== To-Do's ===============
+
         
-        * Add armor to NPC with no armor
         
+        * Add some variation to loot
+            * Beasts should have limited loot. Come up with a list.
 
             == Narrative / Biography ==    
             __ Should we choose Gender?  May help choose things like jewelry
@@ -154,8 +161,13 @@
     * Macro to make magic items easily for DMs
         * Dialog screen with options
         * Automated routine for generating loot 
+        
+    * Random dungeon generator
+        * Drops tiles on screen from an online repo of dungeon images
+        * Allows creating NPCs, Treasure.  
 
 */
+console.clear();
 
 //Constants for tweaking scale settings
 const ABILITY_LEVEL_PER_PLUS = 3;
@@ -259,17 +271,19 @@ async function main(opt){
         }
 
         //Items Adjust
-        tad.has_multiattack = false;
+        tad.has_armor = false
         tad.has_shield = false;
+        tad.has_weapon = false;
         for (let item of token.actor.items){
             if (tad.is_humanoid){
                 //console.log("   isHumanoid!");
                 //Weapons / Armor
                 if (item.type === "weapon"){
                     //console.log("   weapon")
+                    tad.has_weapon = true;
                     let new_name = "";
                     let weapon_plus = await item_plus_get(tad);
-                    l("Weapon_plus: " + weapon_plus);
+                    //l("Weapon_plus: " + weapon_plus);
                     if (weapon_plus > 0){
                         new_name = " +" + weapon_plus;                        
                     }
@@ -318,18 +332,14 @@ async function main(opt){
                     //console.log("Trying to add weapon: " + new_name);
                     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
                 } else if (item.type === "feat"){
-                    if (item.name == "Multiattack"){
-                        tad.has_multiattack = true;
-                    }
                     if (item.name.indexOf("Multiattack (") > -1){
-                        //Remove our versions of Multiattacks
-                        //console.log(item);
                         await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
                     }
                 } else {
-                    console.log(item);
-                    log("Armor", item.data.data.armor)
+                    //console.log(item);
+                    //l("Armor", item.data.data.armor)
                     if (item.data.data.armor && !item.name.indexOf("Shield")){
+                        tad.has_armor = true;
                         let armor_plus_str = await armor_get(tad);
                         tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
                     }
@@ -377,7 +387,7 @@ async function main(opt){
             }
             
         }
-        
+
         //Has Shield?
         if (tad.has_shield){
             let shield_plus = await item_plus_get(tad);
@@ -390,36 +400,31 @@ async function main(opt){
             tad.items_to_add_compendium.push(["dnd5e.items", tad.shield_name])
         }
 
+        //Add armor for Humanoids without armor
+        if (!tad.has_armor && tad.is_humanoid){
+            let armor_plus_str = await armor_get(tad);
+            tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
+        }
+
+        //Add weapons for Humanoids without weapons
+        if (!tad.has_weapon && tad.is_humanoid){
+            await weapon_add(tad, tad.template.weapons_2_handed_range);
+            await weapon_add(tad, tad.template.weapons_1_handed);
+        }
+
         //Does multi-Attack need added?
         if (tad.is_humanoid){
-            if (!tad.has_multiattack){
+            if (!tad.has_multiattack && tad.template.has_multiattack){
                 if (tad.cr_new > 2){
                     if (tad.cr_new > 11){
-                        tad.items_to_add_raw.push({
-                            name: "Multiattack (3 Attacks)",
-                            type: "feat",
-                            data: {
-                                description: {
-                                    value: "The NPC gets 3 melee attacks."
-                                }
-                            }
-                        });
+                        feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
                     } else {
-                        tad.items_to_add_raw.push({
-                            name: "Multiattack (2 Attacks)",
-                            type: "feat",
-                            data: {
-                                description: {
-                                    value: "The NPC gets 2 melee attacks."
-                                }
-                            }
-                        });
-                        
+                        feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
                     }
                 }
             }
         }
-        
+
         //Add spells for spellcasters
         if (tad.spellcaster_type){
             for (let level = 1; level <= tad.max_spell_level; level++){
@@ -433,7 +438,7 @@ async function main(opt){
         //Add coins, treasure
         if (tad.opt.adjust_loot){
             tad.item_types_to_delete.push("loot");
-            loot_get(tad);
+            loot_generate(tad);
         }
 
         await token.document.update(actorData_updates);
@@ -483,6 +488,17 @@ async function armor_get(tad){
     } else {
         return armor[armor_number];
     }
+}
+function feat_add_queue(tad, name, description){
+    tad.items_to_add_raw.push({
+        name: name,
+        type: "feat",
+        data: {
+            description: {
+                value: description
+            }
+        }
+    });
 }
 function gender_get(){
     return ["Male","Female"].random();
@@ -560,31 +576,33 @@ async function items_update(token, updates){
     console.log(updates);
     await token.actor.updateEmbeddedDocuments("Item", updates);
 }
-async function loot_get(tad){
+function loot_add_queue(tad, name, quantity, price, img){
+    tad.items_to_add_raw.push({
+        name: name,
+        type: "loot",
+        data: {
+            quantity: quantity,
+            price: price,
+        },
+        img:img
+    });
+}
+async function loot_generate(tad){
     tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
     let gem_percent = GEM_BASE_PERCENT + roll_simple((100 - GEM_BASE_PERCENT));
     let gem_value = Math.round(tad.base_gp * (gem_percent/100));
     let gem_qty = roll_simple(tad.cr_new);
     let gp_value = tad.base_gp - gem_value;
+    
+    //Simple loot uses svg icons; Magic loot uses full color icons
+    
+    
+    
     if (gem_value > 0){
-        tad.items_to_add_raw.push({
-            name: "Ancient Necklace",
-            type: "loot",
-            data: {
-                quantity: gem_qty,
-                price: gem_value,
-            }
-        });
+        loot_add_queue(tad, "Gems", gem_qty, gem_value, "icons/svg/item-bag.svg");
     }
     if (gp_value > 0){
-        tad.items_to_add_raw.push({
-            name: "Gold Pieces (" + gp_value + ")",
-            type: "loot",
-            data: {
-                quantity: gp_value,
-                price: gp_value,
-            },
-        });
+        loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, gp_value, "icons/svg/coins.svg");
     }
 }
 function npc_count_get(){
@@ -674,15 +692,19 @@ async function template_choose(tad){
         if (tad.spellcaster_type){
             if (tad.spellcaster_type == "wis"){
                 template.class = "cleric";
+                template.has_multiattack = false;
             } else {
                 template.class = "wizard";
+                template.has_multiattack = false;
             }            
         } else {
             template.class = "fighter";
+            template.has_multiattack = true;
         }
     } else {
         //Non-Humanoid
         template.class = "non-humanoid";
+        template.has_multiattack = false;
     }
     //console.log("Template class: " + template.class);
 
@@ -738,8 +760,8 @@ async function template_choose(tad){
             ];
             template.weapons_1_handed = ["Dagger","Dart"];
             template.weapons_2_handed = ["Quarterstaff"];
-            template.weapons_1_handed_range = ["Dart"];
-            template.weapons_2_handed_range = [];
+            template.weapons_1_handed_range = ["Dart","Sling"];
+            template.weapons_2_handed_range = ["Light Crossbow"];
             break;
     }
     //console.log(template);
@@ -816,6 +838,20 @@ async function weapon_range_get(tok){
 function experience_points_get(cr){
     let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
     return xp[cr];
+}
+async function weapon_add(tad, template_weapon_array){
+    let new_name = "";
+    let weapon = "";
+    let weapon_plus = await item_plus_get(tad);
+    if (weapon_plus > 0){
+        new_name = " +" + weapon_plus;                        
+    }                            
+    let n = template_weapon_array.length;
+    let r = roll_simple(n)-1;
+    weapon = template_weapon_array[r];  
+    new_name = weapon + new_name;
+    console.log("Trying to add weapon: " + new_name);
+    tad.items_to_add_compendium.push(["dnd5e.items", new_name])
 }
 //================================== Dialogs ==================================
 function dialog_start(){
@@ -916,6 +952,7 @@ function dialog_start(){
               opt.clear_weapons    = document.getElementById("weapons_clear").checked
 
               main(opt);
+              d.render(true);
           }
         },
         loot: {
@@ -935,14 +972,10 @@ function dialog_start(){
                 opt.clear_spells = false;
                 opt.clear_weapons = false;
                 main(opt);
+                d.render(true);
             }
-        },
-        cancel: {
-          icon: "<i class='fas fa-times'></i>",
-          label: "Cancel"
-        },
-      },
-      default: "yes"
+        }
+      }
     }).render(true);
 }
 function log(group, logStr){
