@@ -22,6 +22,9 @@
         * Pluses for Armor and Weapons were tweaked to be more fair/random
         * Add armor to Humanoid NPC with no armor
         * Add weapon to Humanoid NPC with no weapon
+        * Add some variation to loot
+            * Beasts should have limited loot. Come up with a list.
+        * Basics of Biography
         
         =============== Questions Unanswered ===============
         Q: Can we access external javascript data files (github, bitbucket) for lists, arrays?
@@ -42,53 +45,31 @@
         
         let img = "<data:image asdadopdhasdgfigu;wqeilfr reoi8uawefoadsfoivuihafdvnio>";
         
-        =============== To-Do's ===============
-
+        =============== To-Do's =================================================================
         
+        * Can we add a Utility to the HUD to launch our macros(s)
         
-        * Add some variation to loot
-            * Beasts should have limited loot. Come up with a list.
+        * test [].random() for text strings
+        
+        * Need to template-ize armor. Mages are getting armor like fighters
+        
 
-            == Narrative / Biography ==    
-            __ Should we choose Gender?  May help choose things like jewelry
-            __ Should we choose name?
-            __ Should we include some character traits, disposition, history, etc
+        == Narrative / Biography ==    
+        Done * Should we choose Gender?  May help choose things like jewelry
+        __ Should we include some character traits, disposition, personality, history, etc
                 for flavor and DM use?
+
 
         * Add a chat message to indicate token was scaled
 
         *** Add a help button on the start dialog to popup a help dialog.
+            * Upgrading an NPC with less that CR 1 by 0 will make the NPC CR 1.
     
         * Add a checkbox that is unchecked by default for "Allow exceed 5e SRD rules" <-- something like this...
-
-
-
-
-        * Non-Human NPCs            
-            Intelligent
-                vs
-            Non-Intelligent        
-                No spells
 
       * Add debug option / info
       
       
-      ================ Tweaking for release ==========================
-      
-      
-
-***** Notes to users:
-    * Upgrading an NPC with less that CR 1 by 0 will make the NPC CR 1.
-    
-    
-    ===============================================================================================
-
-    Questions:
-        
-        * Armor
-            Need a better way to hand out armor
-            When to add a shield
-
 
     ===============================
     Wish list for version 2
@@ -96,6 +77,12 @@
     
     * Misc Magic Items
         Compendium necessary?
+        
+    * Auras, Sounds - May require Compendium
+        * Get a list of all modules we will depend on
+            * Midi-QoL, DAE, AA, 
+    
+        
 
     Humanoids, Non-humanoids
         *Features - build in some logic for who gets what
@@ -176,6 +163,7 @@ const LEVEL_PER_PLUS_ARMOR = 7;
 const LEVEL_PER_PLUS_SHIELD = 7;
 const LEVEL_PER_PLUS_WEAPON = 7;
 const NPC_HIT_DIE = 12;
+const TAB = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
 if (canvas.tokens.controlled.length == 0){ alert("Please select at least one NPC!"); return;}
 
@@ -192,6 +180,9 @@ async function main(opt){
 
         //Setup temp array for processing current token
         let tad  = [];
+        tad.bio_narrative = [];
+        tad.bio_traits = [];
+        tad.bio_updates = [];
         tad.item_types_to_delete = [];
         tad.items_to_add_compendium = [];
         tad.items_to_add_raw = [];
@@ -209,35 +200,48 @@ async function main(opt){
 
         //Scale basic token info
         tad.cr = TADD.details.cr;
+        tad.cr_orig = original_actorData.data.details.cr;
         if (tad.cr < 1){ tad.cr = 1; }
         tad.cr_new = tad.cr + tad.opt.cr_change;
         if (tad.cr_new < 1){ tad.cr_new = 1; }
         actorData_updates[AD+"details.cr"] = tad.cr_new;
-        tad.cr_change_since_orig = Math.round(tad.cr_new - original_actorData.data.details.cr);
+        tad.cr_change_since_orig = Math.round(tad.cr_new - tad.cr_orig);
 
         //Misc Token info
         tad.alignment = TADD.details.alignment;
         tad.gender = gender_get();
+        tad.name = token.actor.data.token.name;
         tad.race = TADD.details.race;
-        tad.is_humanoid = is_humanoid(TADD.details.type.value);
+        tad.type = TADD.details.type.value;
+        tad.is_humanoid = is_humanoid(tad);     tad.bio_traits.push(["Humanoid", tad.is_humanoid]);
         tad.max_spell_level = spell_level_get_max(tad.cr_new);
         tad.spellcaster_type = TADD.attributes.spellcasting;
+        tad.bio_updates.push(["CR", original_actorData.data.details.cr, tad.cr_new]);
+        tad.bio_traits.push(["Gender", tad.gender]);
 
         //Social Status, Luck
         tad.social_status = social_status_get(token,tad);
         tad.luck = roll_bell_curve_1000();
         tad.xp = experience_points_get(tad.cr_new);
         tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
+        tad.bio_traits.push(["Luck factor", tad.luck]);
+        tad.bio_traits.push(["Social Status factor", tad.social_status]);
+        l(tad);
 
         //Read in template
         tad.template = await template_choose(tad);
 
         //Abilities Adjust
+        tad.con = original_actorData.data.abilities.con.value;
         if (tad.opt.adjust_abilities){
-            tad.con = original_actorData.data.abilities.con.value;
             for (let ability of tad.template.abilities){
-                let new_value = original_actorData.data.abilities[ability].value + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
+                let orig_ability = original_actorData.data.abilities[ability].value;
+                
+                console.log("orig ability: " + ability + " : " + orig_ability);
+                
+                let new_value = orig_ability + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
                 actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
+                tad.bio_updates.push([ability.capitalize(), orig_ability, new_value]);
                 if (ability == "con"){ tad.con = new_value; }
             }
         }
@@ -249,6 +253,7 @@ async function main(opt){
         if (opt.adjust_hp){
             let hp = TADD.attributes.hp.max;
             tad.hp = (tad.cr_new * NPC_HIT_DIE) + (parseInt((tad.con - 10) / 2) * tad.cr_new);
+            tad.bio_updates.push(["HP", original_actorData.data.attributes.hp.max, tad.hp]);
             actorData_updates[AD+"attributes.hp.max"] = tad.hp;
         }
 
@@ -261,6 +266,7 @@ async function main(opt){
                 if (cur_m > 0){
                     tad.movement[m] = Math.round(cur_m + tad.cr_new);
                     actorData_updates[AD+"attributes.movement." + m] = tad.movement[m];
+                    tad.bio_updates.push([m.capitalize(), cur_m + "'", tad.movement[m] + "'"])
                 }
             }
         } else {
@@ -318,19 +324,16 @@ async function main(opt){
                             //console.log(tok);
                             let n = tad.template.weapons_1_handed.length;
                             let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_1_handed[r];                            
-                            
+                            weapon = tad.template.weapons_1_handed[r];  
                             //Add a shield?
                             if (tad.template.class == "Fighter"){
                                 tad.has_shield = true;
                             }
-                            
-                            
                         }
                     }
                     new_name = weapon + new_name;
-                    //console.log("Trying to add weapon: " + new_name);
                     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
+                    tad.bio_narrative.push("Was given a weapon: " + new_name + ". ");
                 } else if (item.type === "feat"){
                     if (item.name.indexOf("Multiattack (") > -1){
                         await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
@@ -398,6 +401,7 @@ async function main(opt){
                 tad.shield_name = "Shield";
             }
             tad.items_to_add_compendium.push(["dnd5e.items", tad.shield_name])
+            tad.bio_narrative.push("Was given a " + tad.shield_name + ". ");
         }
 
         //Add armor for Humanoids without armor
@@ -435,17 +439,21 @@ async function main(opt){
             actorData_updates[AD+"details.spellLevel"] = tad.cr_new;
         }
         
-        //Add coins, treasure
-        if (tad.opt.adjust_loot){
+        //Loot
+        if (tad.opt.adjust_loot && tad.is_humanoid){
             tad.item_types_to_delete.push("loot");
             loot_generate(tad);
         }
+
+        //Update biography
+        tad.bio = original_actorData.data.details.biography.value + "<br><hr>";
+        await biography_update(tad);
+        actorData_updates[AD+"details.biography.value"] = tad.bio;
 
         await token.document.update(actorData_updates);
         await item_types_remove(token, tad);                //Remove all selected item types
         await items_add(token, tad);                        //Add all items
         await items_equip_all(token);                       //Equip, identify, make proficient all items
-        //await token.document.update(tok.data_to_update);    //Update all token data at once!
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
 
         console.log(tad);
@@ -482,11 +490,39 @@ async function armor_get(tad){
     if (tad.adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
     
     let armor_plus = await item_plus_get(tad);
-    l("armor_plus: " + armor_plus);
+    //l("armor_plus: " + armor_plus);
+    let armor_str = "";
     if (armor_plus > 0){
-        return armor[armor_number] + " +" + armor_plus;
+        armor_str = armor[armor_number] + " +" + armor_plus;
     } else {
-        return armor[armor_number];
+        armor_str = armor[armor_number];
+    }
+    tad.bio_narrative.push("Was given armor: " + armor_str + ". ");
+    return armor_str;
+}
+async function biography_update(tad){
+    tad.bio += "<table border=0 cellpadding=0 cellspacing=0 width=100%>";
+    tad.bio += "<tr><td valign=top width=50%>";
+    tad.bio += "        <table border=0 cellpadding=0 cellspacing=0>"
+    tad.bio += "            <tr><td colspan=3><center><b><u>Updates</u></b></td></tr>";
+    tad.bio += "            <tr><td></td><td><center>Original</center></td><td><center>Current</center></td></tr>";
+    for (let update of tad.bio_updates){
+        tad.bio +=         "<tr><td>" + update[0] + "</td>";
+        tad.bio +=         "    <td><center>" + update[1] + "</center></td>";
+        tad.bio +=         "    <td><center>" + update[2] + "</center></td>";
+        tad.bio +=         "</tr>";
+    }
+    tad.bio += "        </table>";
+    tad.bio += "</center></td><td valign=top width=50%>";
+    tad.bio += "        <table border=0 cellpadding=0 cellspacing=0>"
+    tad.bio += "            <tr><td colspan=3><center><b><u>Misc Info</u></b></td></tr>";
+    for (let trait of tad.bio_traits){
+        tad.bio +=         "<tr><td>" + trait[0] + "</td><td>" + trait[1] + "</td></tr>";
+    }
+    tad.bio += "        </table>";
+    tad.bio += "</center></td></td></table><br>";
+    for (let narr of tad.bio_narrative){
+        tad.bio += narr;
     }
 }
 function feat_add_queue(tad, name, description){
@@ -503,8 +539,8 @@ function feat_add_queue(tad, name, description){
 function gender_get(){
     return ["Male","Female"].random();
 }
-function is_humanoid(type){
-    if (["celestial","fey","giant","humanoid"].includes(type.toLowerCase())){
+function is_humanoid(tad){
+    if (["celestial","fiend","fey","giant","humanoid"].includes(tad.type.toLowerCase()) || ["centaur","drider","ghast","ghoul","lich","medusa","merrow","minotaur","minotaur skeleton","mummy lord","ogre zombie","skeleton","vampire","vampire spawn","wight","zombie"].includes(tad.name.toLowerCase())){
         return true;
     } else {
         return false;
@@ -599,7 +635,7 @@ async function loot_generate(tad){
     
     
     if (gem_value > 0){
-        loot_add_queue(tad, "Gems", gem_qty, gem_value, "icons/svg/item-bag.svg");
+        loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, gem_value, "icons/svg/item-bag.svg");
     }
     if (gp_value > 0){
         loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, gp_value, "icons/svg/coins.svg");
@@ -701,10 +737,16 @@ async function template_choose(tad){
             template.class = "fighter";
             template.has_multiattack = true;
         }
+        template.loot_class = "humanoid";
     } else {
         //Non-Humanoid
         template.class = "non-humanoid";
         template.has_multiattack = false;
+        if (tad.type == "Beast"){
+            template.loot_class = "beast";
+        } else {
+            template.loot_class = "non-humanoid";
+        }
     }
     //console.log("Template class: " + template.class);
 
@@ -850,8 +892,9 @@ async function weapon_add(tad, template_weapon_array){
     let r = roll_simple(n)-1;
     weapon = template_weapon_array[r];  
     new_name = weapon + new_name;
-    console.log("Trying to add weapon: " + new_name);
+    //console.log("Trying to add weapon: " + new_name);
     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
+    tad.bio_narrative.push("Was given a weapon: " + new_name + ". ");
 }
 //================================== Dialogs ==================================
 function dialog_start(){
@@ -988,3 +1031,4 @@ function l(logStr){
 }
 // Javascript Extensions:
 Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
+String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
