@@ -224,7 +224,8 @@ async function main(opt){
         tad.bio_traits.push(["Gender", tad.gender]);
 
         //Social Status, Luck
-        tad.social_status = social_status_get(token,tad);
+        //tad.social_status = social_status_get(token,tad);
+        tad.social_status = roll_bell_curve_1000(TADD.abilities.cha.mod * 2);
         tad.luck = roll_bell_curve_1000();
         tad.xp = experience_points_get(tad.cr_new);
         tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
@@ -303,15 +304,15 @@ async function main(opt){
                         if (item.name.indexOf("bow") > -1){
                             //console.log("   bow")
                             //Add a bow
-                            let n = tad.template.weapons_2_handed_range.length;
-                            let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_2_handed_range[r];
+                            //let n = tad.template.weapons_2_handed_range.length;
+                            //let r = roll_simple(n)-1;
+                            weapon = tad.template.weapons_2_handed_range.random();
                         } else {
                             //console.log("   non-range weapon")
                             //Add a hand weapon
-                            let n = tad.template.weapons_2_handed.length;
-                            let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_2_handed[r];
+                            //let n = tad.template.weapons_2_handed.length;
+                            //let r = roll_simple(n)-1;
+                            weapon = tad.template.weapons_2_handed.random();
                         }
                     } else {
                         //console.log("   one-handed weapon")
@@ -319,16 +320,16 @@ async function main(opt){
                             //Add a ranged one-handed weapon
                             //console.log(tok.template.weapons_1_handed_range)
                             //console.log(tok);
-                            let n = tad.template.weapons_1_handed_range.length;
-                            let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_1_handed_range[r];
+                            //let n = tad.template.weapons_1_handed_range.length;
+                            //let r = roll_simple(n)-1;
+                            weapon = tad.template.weapons_1_handed_range.random();
                         } else {
                             //Add a non-ranged one handed weapon
                             //console.log(tok.template.weapons_1_handed)
                             //console.log(tok);
-                            let n = tad.template.weapons_1_handed.length;
-                            let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_1_handed[r];  
+                            //let n = tad.template.weapons_1_handed.length;
+                            //let r = roll_simple(n)-1;
+                            weapon = tad.template.weapons_1_handed.random();  
                             //Add a shield?
                             if (tad.template.class == "Fighter"){
                                 tad.has_shield = true;
@@ -338,10 +339,6 @@ async function main(opt){
                     new_name = weapon + new_name;
                     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
                     tad.bio_narrative.push("Was given a weapon: " + new_name + ". ");
-                } else if (item.type === "feat"){
-                    if (item.name.indexOf("Multiattack (") > -1){
-                        await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
-                    }
                 } else {
                     //console.log(item);
                     //l("Armor", item.data.data.armor)
@@ -392,7 +389,11 @@ async function main(opt){
                     await token.actor.updateEmbeddedDocuments("Item", tad.items_updates);
                 }
             }
-            
+            if (item.type === "feat"){
+                if (is_humanoid && tad.template.has_multiattack && item.name.indexOf("Multiattack") > -1){
+                    await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
+                }
+            }
         }
 
         //Has Shield?
@@ -421,16 +422,16 @@ async function main(opt){
         }
 
         //Does multi-Attack need added?
-        if (tad.is_humanoid){
-            if (!tad.has_multiattack && tad.template.has_multiattack){
-                if (tad.cr_new > 2){
-                    if (tad.cr_new > 11){
-                        feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
-                    } else {
-                        feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
-                    }
+        if (is_humanoid && tad.template.has_multiattack){
+            if (tad.cr_new > 2){
+                if (tad.cr_new > 11){
+                    feat_add_queue(tad, "Multiattack (3 Attacks)", "The NPC gets 3 melee attacks.");
+                } else {
+                    feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
                 }
             }
+        } else {
+            // No need to touch or add multiattacks for Non-Humanoids!!!
         }
 
         //Add spells for spellcasters
@@ -451,14 +452,38 @@ async function main(opt){
 
         //Update biography
         tad.bio = original_actorData.data.details.biography.value + "<br><hr>";
+        
+        console.log("Before Biography Update");
+        
         await biography_update(tad);
         actorData_updates[AD+"details.biography.value"] = tad.bio;
 
+        console.log("After Biography Update");
+        console.log("Before Token.document.update");
+
         await token.document.update(actorData_updates);
+        
+        console.log("After Token.document.update");
+        console.log("Before item_types_remove");
+        
         await item_types_remove(token, tad);                //Remove all selected item types
+        
+        console.log("After item_types_remove");
+        console.log("Before items_add");
+        
         await items_add(token, tad);                        //Add all items
+        
+        console.log("After items_add");
+        console.log("Before items_equip_all");
+        
         await items_equip_all(token);                       //Equip, identify, make proficient all items
+        
+        console.log("After items_equip_all");
+        console.log("Before longRest");
+        
         await token.actor.longRest({ dialog: false });      //Refresh spellslots and hp
+        
+        console.log("After longRest");
 
         console.log(tad);
         console.log(original_actorData)
@@ -490,15 +515,8 @@ async function armor_get(tad){
     armor["Light"]  = ["Padded Armor","Leather Armor","Studded Leather Armor"];
     armor["Medium"] = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor"];
     armor["Heavy"]  = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor","Ring Mail","Chain Mail","Splint Armor","Plate Armor"];
-    
-    let armor_length = armor[tad.template.armor].length;
-    let armor_string = armor[tad.template.armor][roll_simple(armor_length)-1];
-    
-    //console.log(tad);
-    //if (tad.adjusted_cr > 12){ tad.adjusted_cr = 12; }
-    //if (tad.adjusted_cr > 0 && tad.adjusted_cr < 5){ armor_number = roll_simple(4); }
-    //if (tad.adjusted_cr > 4 && tad.adjusted_cr < 10){ armor_number = roll_simple(4) + 4; }
-    //if (tad.adjusted_cr >= 10){                  armor_number = roll_simple(4) + 8; }
+
+    let armor_string = armor[tad.template.armor].random();
 
     let armor_plus = await item_plus_get(tad);
     //l("armor_plus: " + armor_plus);
@@ -578,8 +596,6 @@ async function item_plus_get(tad){
             if(roll <= percent_w){ return 3; } else { return (roll_simple(3)-1); }
     }
 }
-
-
 async function item_types_remove(token, tad){
     for (let i of token.actor.items){
         //console.log(i.name + " : " + i.type)
@@ -604,12 +620,25 @@ async function items_delete(token, items){
     await token.actor.deleteEmbeddedDocuments( "Item", items );
 }
 async function items_equip_all(token){
-    for (let i of token.actor.items){
-        if (i.type == "equipment" || i.type == "weapon"){
-            await item_equipped_identified_proficient(token, i)
+    let items_updates = [];
+    for (let item of token.actor.items){
+        if (item.type == "equipment" || item.type == "weapon"){
+            items_updates.push({
+                _id:item.id, 
+                data:{
+                    equipped: true,
+                    identified: true,
+                    proficient: true
+                }
+            })
+            console.log("item.name:", item.name);
+            //await item_equipped_identified_proficient(token, i)
         }
     }
+    await token.actor.updateEmbeddedDocuments("Item", items_updates);
+    //item_equipped_identified_proficient(token, items_updates);
 }
+/*
 async function item_equipped_identified_proficient(token, item){
     await token.actor.updateEmbeddedDocuments("Item", [{
         _id:item.id, 
@@ -621,6 +650,7 @@ async function item_equipped_identified_proficient(token, item){
         }]
     );
 }
+*/
 async function items_update(token, updates){
     console.log(updates);
     await token.actor.updateEmbeddedDocuments("Item", updates);
@@ -644,9 +674,7 @@ async function loot_generate(tad){
     let gp_value = tad.base_gp - gem_value;
     
     //Simple loot uses svg icons; Magic loot uses full color icons
-    
-    
-    
+
     if (gem_value > 0){
         loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, gem_value, "icons/svg/item-bag.svg");
     }
@@ -679,8 +707,8 @@ function party_level_average_get(){
     }
     return Math.round(party_level_total / party_count);
 }
-function roll_bell_curve_1000(){
-    let roll = roll_simple(1000);
+function roll_bell_curve_1000(adder = 0){
+    let roll = roll_simple(1000) + adder;
     switch(true){
         case (roll<5):   return 0.25; //1-4         4/1000   =  0.4%
         case (roll<21):  return 0.50; //5-20        16/1000  =  1.6%
@@ -715,21 +743,6 @@ function spell_level_get_max(cr){
     if (cr >14) l = 8;
     if (cr >16) l = 9;
     return l;
-}
-function social_status_get(token,tad){
-    let roll = roll_simple(1000);
-    tad.social_status_before = roll;
-    roll += (token.actor.data.data.abilities.cha.mod * 2)
-    tad.social_status_after = roll;
-    switch(true){
-        case (roll<5):   return 0.25; //1-4         4/1000   =  0.4%
-        case (roll<21):  return 0.50; //5-20        16/1000  =  1.6%
-        case (roll<161): return 0.75; //21-160      140/1000 = 14.0%
-        case (roll<841): return 1.00; //161-840     680/1000 = 68.0%
-        case (roll<981): return 1.25; //861-980     140/1000 = 14.0%
-        case (roll<997): return 2.00; //981-996     16/1000  =  1.6%
-        default:         return 4.00; //997-1000    4/1000   =  0.4%
-    }
 }
 async function template_choose(tad){
     let template = [];
@@ -828,71 +841,6 @@ async function template_choose(tad){
 async function token_update(token, tok){
     await token.document.update(tok.data_to_update);
 }
-async function weapon_melee_get(tok){
-    let weapon_m = [];
-    weapon_m.push("Dagger");
-    weapon_m.push("Greatsword");
-    weapon_m.push("Longsword");
-    weapon_m.push("Mace");
-    weapon_m.push("Shortsword");
-    weapon_m.push("Greataxe");
-    weapon_m.push("Battleaxe");
-    weapon_m.push("Handaxe");
-    weapon_m.push("Maul");
-    weapon_m.push("Spear");
-    weapon_m.push("Scimitar");
-    weapon_m.push("Flail");
-    weapon_m.push("Quarterstaff");
-    weapon_m.push("Glaive");
-    weapon_m.push("Halberd");
-    weapon_m.push("Lance");
-    weapon_m.push("Light Hammer");
-    weapon_m.push("Morningstar");
-    weapon_m.push("Pike");
-    weapon_m.push("Rapier");
-    weapon_m.push("Sickle");
-    weapon_m.push("Trident");
-    weapon_m.push("War Pick");
-    weapon_m.push("Warhammer");
-    weapon_m.push("Whip");
-    let weapon_melee_number = roll_simple(25) - 1;
-    //Add a plus to the weapons
-    let weapon_plus = Math.round(tok.cr_new / 4);
-    let weapon_plus_str = "";
-    if (weapon_plus == 0){
-        weapon_plus_str = weapon_m[weapon_melee_number];
-    } else if (weapon_plus > 3){
-        weapon_plus_str = weapon_m[weapon_melee_number] + " +3";
-    } else {
-        weapon_plus_str = weapon_m[weapon_melee_number] + " +" + weapon_plus;
-    }
-    return weapon_plus_str;
-}
-async function weapon_range_get(tok){
-    let weapon_r = [];
-    weapon_r.push("Blowgun");
-    weapon_r.push("Dart");
-    weapon_r.push("Javelin");
-    weapon_r.push("Spear");
-    weapon_r.push("Sling");
-    weapon_r.push("Shortbow");
-    weapon_r.push("Longbow");
-    weapon_r.push("Heavy Crossbow");
-    weapon_r.push("Hand Crossbow");
-    weapon_r.push("Light Crossbow");
-    let weapon_range_number = roll_simple(10) - 1;
-    //Add a plus to the weapons
-    let weapon_plus = Math.round(tok.cr_new / 4);
-    let weapon_plus_str = "";
-    if (weapon_plus == 0){
-        weapon_plus_str = weapon_r[weapon_range_number];
-    } else if (weapon_plus > 3){
-        weapon_plus_str = weapon_r[weapon_range_number] + " +3";
-    } else {
-        weapon_plus_str = weapon_r[weapon_range_number] + " +" + weapon_plus;
-    }
-    return weapon_plus_str;
-}
 function experience_points_get(cr){
     let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
     return xp[cr];
@@ -904,9 +852,9 @@ async function weapon_add(tad, template_weapon_array){
     if (weapon_plus > 0){
         new_name = " +" + weapon_plus;                        
     }                            
-    let n = template_weapon_array.length;
-    let r = roll_simple(n)-1;
-    weapon = template_weapon_array[r];  
+    //let n = template_weapon_array.length;
+    //let r = roll_simple(n)-1;
+    weapon = template_weapon_array.random();
     new_name = weapon + new_name;
     //console.log("Trying to add weapon: " + new_name);
     tad.items_to_add_compendium.push(["dnd5e.items", new_name])
@@ -1046,5 +994,7 @@ function l(logStr){
     console.log(logStr);
 }
 // Javascript Extensions:
-Array.prototype.random = function () { return this[Math.floor((Math.random()*this.length))]; }
+Array.prototype.random = function () { 
+    return this[Math.floor((Math.random()*this.length))];
+}
 String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
