@@ -537,10 +537,10 @@ async function loot_generate(tad){
     //Simple loot uses svg icons; Magic loot uses full color icons
 
     if (gem_value > 0){
-        loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, gem_value, "icons/svg/item-bag.svg");
+        loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, parseInt(gem_value/gem_qty), "icons/svg/item-bag.svg");
     }
     if (gp_value > 0){
-        loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, gp_value, "icons/svg/coins.svg");
+        loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, 1, "icons/svg/coins.svg");
     }
 }
 function npc_count_get(){

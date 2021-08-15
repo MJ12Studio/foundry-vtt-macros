@@ -64,12 +64,64 @@ async function main(){
             //Queue up all items to copy to chest
             items_to_delete.push(item._id);
         }
-        await chest.actor.deleteEmbeddedDocuments( "Item", items_to_delete );
+        await chest.actor.deleteEmbeddedDocuments("Item", items_to_delete );
         d.render(true);
     }
-    function convert_to_gold(){
+    async function convert_to_gold(){
 
-        
+        let chest = canvas.tokens.children[0].getChildByName("Master Treasure Chest");
+        let items = [];
+        let items_qty = [];
+        let items_updates = [];
+        let items_to_add_raw = [];
+        let items_to_delete = [];
+        let loot_value = 0;
+        for (let item of chest.actor.items){
+            if (item.type === "loot"){
+                loot_value += (parseInt(item.data.data.price) * parseInt(item.data.data.quantity));
+                items_to_delete.push(item._id);
+            } else {
+                console.log("item", item);
+                let item_name = item.name;
+                //console.log(items[item_name]);
+                if (items_qty[item_name]){
+                    console.log("item_name: " + item_name + " exists. Deleting one.");
+                    items_qty[item_name]++;
+
+                    //Adjust qty of 1st item
+                    console.log("adjusting item: ", items[item_name])
+                    items_updates.push({
+                        _id:items[item_name], 
+                        data:{
+                            quantity: items_qty[item_name]
+                        }
+                    })
+                    //Delete this item
+                    items_to_delete.push(item._id);
+
+                } else {
+                    console.log("Adding item: " + item_name)
+                    items_qty[item_name] = 1;
+                    items[item_name] = item._id;
+                }
+            }
+        }
+        console.log(items_qty);
+        console.log("items_updates: ", items_updates);
+        await chest.actor.updateEmbeddedDocuments("Item", items_updates);
+        await chest.actor.deleteEmbeddedDocuments("Item", items_to_delete );
+
+        //Misc Loot
+        items_to_add_raw.push({
+            name: "Coins/Gems",
+            type: "loot",
+            data: {
+                quantity: 1,
+                price: loot_value,
+            }
+        });
+        await chest.actor.createEmbeddedDocuments("Item", items_to_add_raw);
+
     }
     async function npc_loot(){
         //Find Master Chest
@@ -91,7 +143,8 @@ async function main(){
             await chest.actor.createEmbeddedDocuments("Item", items_to_add);
         }
 
-        //See if we can stack items in Chest
+        //convert_to_gold();
+
 
         d.render(true);
     }
