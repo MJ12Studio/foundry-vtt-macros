@@ -17,6 +17,22 @@
     * Senses/Skills
         "Amphibious","Devil Sight", "Ethereal Sight","Freedom of Movement","Hold Breath"
 
+    ==============================================
+    * More tweaking settings/buttons may mean less code
+                                    +'s                   %Chance to have
+        Weapons:  [ ] Allow Magic   [CR / 8]                (0-100%)
+                                    [Very Little (10CR/+)]
+
+        Armor:    [ ] Allow Magic   [CR / +]
+        Shield:   [ ] Allow Shield  [CR / +]
+        Magic Items [ ] 
+
+        Use Luck [ ]
+        Use Social Status [ ]
+
+
+    * Hover information for options
+
 */
 console.clear();
 
