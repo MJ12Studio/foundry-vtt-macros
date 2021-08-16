@@ -44,6 +44,7 @@ async function chest_clear(){
     return 0;
 }
 async function inventory_stack(){
+    status("Stacking inventory...");
     let items = [];
     let items_qty = [];
     let items_updates = [];
@@ -100,11 +101,13 @@ async function inventory_stack(){
     await chestToken.actor.createEmbeddedDocuments("Item", items_to_add_raw);
 
     //End
-    console.log("Inventory Stacked!");
+    status("Finished looting!");
+    let t = setTimeout(function(){ status("....") }, 3000);
     return 0;
 }
 
 async function npc_loot(opt){
+    console.log("opt: ", opt);
     //Make sure some NPCs are selected
     if (canvas.tokens.controlled.length > 0){
         console.log("#NPCs:",canvas.tokens.controlled.length);
@@ -171,10 +174,10 @@ async function npc_loot(opt){
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         let items_to_add = [];
         for (let item of token.actor.items){
-            //Queue up all items to copy to chest
-            //Copy only weapons and inventory items
             if (item.type === "weapon" || item.type === "equipment" || item.type === "loot"){
-                items_to_add.push(item.toObject());
+                if (!opt.cutoff_100gp || (opt.cutoff_100gp && item.data.data.price >= 100)){
+                    items_to_add.push(item.toObject());
+                }
             }
         }
         await chestToken.actor.createEmbeddedDocuments("Item", items_to_add);
@@ -182,7 +185,6 @@ async function npc_loot(opt){
 
     //Combine inventory items if possible
     inventory_stack();
-    return 0;
 }
  
 function dialog_main(){
@@ -190,14 +192,23 @@ function dialog_main(){
     let d = new Dialog({
         title: "Looter",
         content: `
-            <div><label>Exclude Non-Magic Items:</label>     <input id='opt_exclude_non_magic' type='checkbox' checked /></div>
+            <p>&nbsp;</p>
+            <div><label>Cutoff 100gp:</label>     <input id='cutoff_100gp' type='checkbox' checked /></div>
+            <br>
+            <p><hr></p>
+            <center><div id='div_statusbar'>....</div></center><hr>
         `,
         buttons: {
             one: {
                 label: "Loot Selected NPCs",
                 callback: () => {
-                    opt.exclude_non_magic = document.getElementById("opt_exclude_non_magic").checked;
-                    npc_loot(opt);
+                    //opt.cutoff_100gp = document.getElementById("cutoff_100gp").checked;
+                    opt.cutoff_100gp = $("#cutoff_100gp").prop('checked');
+                    let t = setTimeout(async function(){
+                        if (!opt.cutoff_100gp){ $("#cutoff_100gp").prop('checked', false);}
+                        status("The looting has begun...");
+                        await npc_loot(opt);
+                    }, 100);
                     d.render(true);
                 },
                 width: 50
@@ -205,8 +216,10 @@ function dialog_main(){
             three: {
                 label: "Clear out Chest",
                 callback: () => {
-                    chest_clear();
                     d.render(true);
+                    if (window.confirm("Do you really want to clear out chest?")) {
+                        chest_clear();
+                    }
                 }
             }
         }
@@ -223,6 +236,11 @@ function dialog_main(){
     */
 
     d.render(true);
+    //d.close = function(){}
+}
+
+function status(str){
+    $("#div_statusbar").html(str);
 }
 
 
