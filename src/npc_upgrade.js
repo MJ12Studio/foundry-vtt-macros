@@ -53,6 +53,8 @@ async function main(opt){
     opt.npc_count = await npc_count_get();
     opt.party_level_average = await party_level_average_get()
 
+    opt.tweak_factor = 1;
+
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         if (token.actor.type != "npc"){ continue; } //Skip it if it's not an npc
 
@@ -108,6 +110,7 @@ async function main(opt){
         tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
         tad.bio_traits.push(["Luck factor", tad.luck]);
         tad.bio_traits.push(["Social Status factor", tad.social_status]);
+        tad.starting_gold = tad.base_gp = (Math.round(tad.xp * opt.tweak_factor * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr);
         l(tad);
 
         //Read in template
@@ -157,6 +160,9 @@ async function main(opt){
             if (tad.opt.clear_spells){   tad.item_types_to_delete.push("spell"); }
             if (tad.opt.clear_weapons){  tad.item_types_to_delete.push("weapon"); }
         }
+
+        //NPC Equip
+        if (tad.is_humanoid){ npc_equip(tad); }
 
         //Items Adjust
         tad.has_armor = false
@@ -544,6 +550,9 @@ function loot_add_queue(tad, name, quantity, price, img){
     });
 }
 async function loot_generate(tad){
+    /*
+    tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));    
+    */
     tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
     let gem_percent = GEM_BASE_PERCENT + roll_simple((100 - GEM_BASE_PERCENT));
     let gem_value = Math.round(tad.base_gp * (gem_percent/100));
@@ -565,6 +574,39 @@ function npc_count_get(){
         npc_count++;
     }
     return npc_count;
+}
+function npc_equip(tad){
+    /*Figure out what items a NPC has based on their starting_gold
+
+    Weapon, Armor, Shield my be simpler to start with non-magic item and scale up
+    * Get standard version
+    * Buy +
+    *   Armor   1500, 6000, 24000
+    *   Shield  2000, 6000, 24000
+    *   Weapon  1000, 4000, 16000
+
+    */
+    switch(tad,template.class){
+        case "fighter":
+            //Try to buy weapon
+                //1000gp_weapons["Longsword +1","Flail +1"]
+            //Try to buy armor
+            //Try to buy shield
+            //Try to buy misc magic
+            break;
+        case "cleric":
+            //Try to buy armor
+            //Try to buy weapon
+            //Try to buy shield
+            //Try to buy misc magic
+            break;
+        case "wizard":
+            //Try to buy misc magic
+            //Try to buy weapon
+    }
+
+
+
 }
 function party_level_average_get(){
     let party_count = 0;
