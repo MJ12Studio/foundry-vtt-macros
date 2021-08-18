@@ -170,68 +170,7 @@ async function main(opt){
         tad.has_shield = false;
         tad.has_weapon = false;
         for (let item of token.actor.items){
-            if (tad.is_humanoid){
-                //console.log("   isHumanoid!");
-                //Weapons / Armor
-                if (item.type === "weapon"){
-                    //console.log("   weapon")
-                    tad.has_weapon = true;
-                    let new_name = "";
-                    let weapon_plus = await item_plus_get(tad);
-                    //l("Weapon_plus: " + weapon_plus);
-                    if (weapon_plus > 0){
-                        new_name = " +" + weapon_plus;                        
-                    }
-                    let weapon = "";
-                    if (item.data.data.properties.two){
-                        //console.log("   two-handed weapon")
-                        if (item.name.indexOf("bow") > -1){
-                            //console.log("   bow")
-                            //Add a bow
-                            //let n = tad.template.weapons_2_handed_range.length;
-                            //let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_2_handed_range.random();
-                        } else {
-                            //console.log("   non-range weapon")
-                            //Add a hand weapon
-                            //let n = tad.template.weapons_2_handed.length;
-                            //let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_2_handed.random();
-                        }
-                    } else {
-                        //console.log("   one-handed weapon")
-                        if (item.data.data.properties.amm || item.data.data.properties.thrown){
-                            //Add a ranged one-handed weapon
-                            //console.log(tok.template.weapons_1_handed_range)
-                            //console.log(tok);
-                            //let n = tad.template.weapons_1_handed_range.length;
-                            //let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_1_handed_range.random();
-                        } else {
-                            //Add a non-ranged one handed weapon
-                            //console.log(tok.template.weapons_1_handed)
-                            //console.log(tok);
-                            //let n = tad.template.weapons_1_handed.length;
-                            //let r = roll_simple(n)-1;
-                            weapon = tad.template.weapons_1_handed.random();  
-                            //Add a shield?
-                            if (tad.template.class == "Fighter"){
-                                tad.has_shield = true;
-                            }
-                        }
-                    }
-                    new_name = weapon + new_name;
-                    tad.items_to_add_compendium.push(["dnd5e.items", new_name])
-                    tad.bio_narrative.push("Was given a weapon: " + new_name + ". ");
-                } else {
-                    //console.log(item);
-                    //l("Armor", item.data.data.armor)
-                    if (item.data.data.armor && !item.name.indexOf("Shield")){
-                        tad.has_armor = true;
-                        let armor_plus_str = await armor_get(tad);
-                        tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
-                    }
-                }
+            
                 
             } else {
                 //console.log("Non-Humanoid");
@@ -280,30 +219,9 @@ async function main(opt){
             }
         }
 
-        //Has Shield?
-        if (tad.has_shield){
-            let shield_plus = await item_plus_get(tad);
-            l("shield_plus: " + shield_plus);
-            if (shield_plus > 0){
-                tad.shield_name = "Shield +" + shield_plus;
-            } else {
-                tad.shield_name = "Shield";
-            }
-            tad.items_to_add_compendium.push(["dnd5e.items", tad.shield_name])
-            tad.bio_narrative.push("Was given a " + tad.shield_name + ". ");
-        }
+        
 
-        //Add armor for Humanoids without armor
-        if (!tad.has_armor && tad.is_humanoid && tad.template.armor != "None"){
-            let armor_plus_str = await armor_get(tad);
-            tad.items_to_add_compendium.push(["dnd5e.items", armor_plus_str])
-        }
-
-        //Add weapons for Humanoids without weapons
-        if (!tad.has_weapon && tad.is_humanoid){
-            await weapon_add(tad, tad.template.weapons_2_handed_range);
-            await weapon_add(tad, tad.template.weapons_1_handed);
-        }
+        
         */
 
         //Does multi-Attack need added?
@@ -328,12 +246,6 @@ async function main(opt){
             }
             actorData_updates[AD+"details.spellLevel"] = tad.cr_new;
         }
-        
-        //Loot
-        //if (tad.opt.adjust_loot && tad.is_humanoid){
-        //    tad.item_types_to_delete.push("loot");
-        //    loot_generate(tad);
-        //}
 
         //Update biography
         tad.bio = original_actorData.data.details.biography.value + "<br><hr>";
@@ -378,8 +290,6 @@ async function main(opt){
 /*=================================================================
     Functions
   =================================================================*/
-async function armor_get(tad){
-    let armor = [];
     //armor.push("None");                     // 10 0
     //armor.push("Padded Armor");             // 11 1
     //armor.push("Leather Armor");            // 11 2
@@ -393,26 +303,8 @@ async function armor_get(tad){
     //armor.push("Chain Mail");               // 16 10
     //armor.push("Splint Armor");             // 17 11
     //armor.push("Plate Armor");              // 18 12
-    let armor_number = 0;
-    armor["None"]   = [];
-    armor["Light"]  = ["Padded Armor","Leather Armor","Studded Leather Armor"];
-    armor["Medium"] = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor"];
-    armor["Heavy"]  = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor","Ring Mail","Chain Mail","Splint Armor","Plate Armor"];
 
-    let armor_string = armor[tad.template.armor].random();
-
-    let armor_plus = await item_plus_get(tad);
-    //l("armor_plus: " + armor_plus);
-    let armor_str = "";
-    if (armor_plus > 0){
-        armor_str = armor_string + " +" + armor_plus;
-    } else {
-        armor_str = armor_string;
-    }
-    tad.bio_narrative.push("Was given armor: " + armor_str + ". ");
-    return armor_str;
-}
-async function biography_update(tad){
+    async function biography_update(tad){
     tad.bio += "<table border=0 cellpadding=0 cellspacing=0 width=100%>";
     tad.bio += "<tr><td valign=top width=50%>";
     tad.bio += "        <table border=0 cellpadding=0 cellspacing=0>"
@@ -579,17 +471,9 @@ function npc_count_get(){
 function npc_equip(tad){
     console.log("npc_equip()")
     /*Figure out what items a NPC has based on their starting_gold
-    Weapon, Armor, Shield my be simpler to start with non-magic item and scale up
-    * Get standard version
-    * Buy +
-    *   Armor   1500, 6000, 24000
-    *   Shield  2000, 6000, 24000
-    *   Weapon  1000, 4000, 16000
-
     */
     switch(tad.template.class){
         case "Fighter":
-            console.log("Fighter!");
             npc_equip_weapons_normal(tad);
             npc_equip_weapons_magic(tad);
             npc_equip_armor(tad);
@@ -873,21 +757,7 @@ function experience_points_get(cr){
     let xp = Array(0,200,450,700,1100,1800,2300,2900,3900,5000,5900,7200,8400,10000,11500,13000,15000,18000,20000,22000,25000);
     return xp[cr];
 }
-async function weapon_add(tad, template_weapon_array){
-    let new_name = "";
-    let weapon = "";
-    let weapon_plus = await item_plus_get(tad);
-    if (weapon_plus > 0){
-        new_name = " +" + weapon_plus;                        
-    }                            
-    //let n = template_weapon_array.length;
-    //let r = roll_simple(n)-1;
-    weapon = template_weapon_array.random();
-    new_name = weapon + new_name;
-    //console.log("Trying to add weapon: " + new_name);
-    tad.items_to_add_compendium.push(["dnd5e.items", new_name])
-    tad.bio_narrative.push("Was given a weapon: " + new_name + ". ");
-}
+
 //================================== Dialogs ==================================
 function dialog_start(){
     console.log("dialog_start");
