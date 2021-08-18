@@ -110,7 +110,7 @@ async function main(opt){
         tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
         tad.bio_traits.push(["Luck factor", tad.luck]);
         tad.bio_traits.push(["Social Status factor", tad.social_status]);
-        tad.starting_gold = tad.base_gp = (Math.round(tad.xp * opt.tweak_factor * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr);
+        tad.starting_gold = (Math.round((tad.xp/2) * opt.tweak_factor * tad.social_status * tad.luck)) + roll_simple(tad.adjusted_cr);
         l(tad);
 
         //Read in template
@@ -164,6 +164,7 @@ async function main(opt){
         //NPC Equip
         if (tad.is_humanoid){ npc_equip(tad); }
 
+        /*
         //Items Adjust
         tad.has_armor = false
         tad.has_shield = false;
@@ -303,6 +304,7 @@ async function main(opt){
             await weapon_add(tad, tad.template.weapons_2_handed_range);
             await weapon_add(tad, tad.template.weapons_1_handed);
         }
+        */
 
         //Does multi-Attack need added?
         if (is_humanoid && tad.template.has_multiattack){
@@ -328,26 +330,24 @@ async function main(opt){
         }
         
         //Loot
-        if (tad.opt.adjust_loot && tad.is_humanoid){
-            tad.item_types_to_delete.push("loot");
-            loot_generate(tad);
-        }
+        //if (tad.opt.adjust_loot && tad.is_humanoid){
+        //    tad.item_types_to_delete.push("loot");
+        //    loot_generate(tad);
+        //}
 
         //Update biography
         tad.bio = original_actorData.data.details.biography.value + "<br><hr>";
-        
-        console.log("Before Biography Update");
+            console.log("Before Biography Update");
         
         await biography_update(tad);
         actorData_updates[AD+"details.biography.value"] = tad.bio;
 
-        console.log("After Biography Update");
-        console.log("Before Token.document.update");
+            console.log("After Biography Update");
+            console.log("Before Token.document.update");
 
         await token.document.update(actorData_updates);
-        
-        console.log("After Token.document.update");
-        console.log("Before item_types_remove");
+            console.log("After Token.document.update");
+            console.log("Before item_types_remove");
         
         await item_types_remove(token, tad);                //Remove all selected item types
         
@@ -550,14 +550,15 @@ function loot_add_queue(tad, name, quantity, price, img){
     });
 }
 async function loot_generate(tad){
+    tad.item_types_to_delete.push("loot");
     /*
     tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));    
     */
-    tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
+    //tad.base_gp = Math.round((Math.round(tad.xp/10) * tad.social_status * tad.luck) + roll_simple(tad.adjusted_cr));
     let gem_percent = GEM_BASE_PERCENT + roll_simple((100 - GEM_BASE_PERCENT));
-    let gem_value = Math.round(tad.base_gp * (gem_percent/100));
+    let gem_value = Math.round(tad.starting_gold * (gem_percent/100));
     let gem_qty = roll_simple(tad.cr_new);
-    let gp_value = tad.base_gp - gem_value;
+    let gp_value = tad.starting_gold - gem_value;
     
     //Simple loot uses svg icons; Magic loot uses full color icons
 
@@ -576,8 +577,8 @@ function npc_count_get(){
     return npc_count;
 }
 function npc_equip(tad){
+    console.log("npc_equip()")
     /*Figure out what items a NPC has based on their starting_gold
-
     Weapon, Armor, Shield my be simpler to start with non-magic item and scale up
     * Get standard version
     * Buy +
@@ -586,28 +587,129 @@ function npc_equip(tad){
     *   Weapon  1000, 4000, 16000
 
     */
-    switch(tad,template.class){
-        case "fighter":
-            //Try to buy weapon
-                //1000gp_weapons["Longsword +1","Flail +1"]
-            //Try to buy armor
-            //Try to buy shield
-            //Try to buy misc magic
+    switch(tad.template.class){
+        case "Fighter":
+            console.log("Fighter!");
+            npc_equip_weapons_normal(tad);
+            npc_equip_weapons_magic(tad);
+            npc_equip_armor(tad);
             break;
-        case "cleric":
-            //Try to buy armor
-            //Try to buy weapon
-            //Try to buy shield
-            //Try to buy misc magic
+        case "Cleric":
+            npc_equip_weapons_normal(tad);
+            npc_equip_weapons_magic(tad);
+            npc_equip_armor(tad);
             break;
-        case "wizard":
-            //Try to buy misc magic
-            //Try to buy weapon
+        case "Wizard":
+            npc_equip_weapons_normal(tad);
+            npc_equip_misc_magic(tad);
+            npc_equip_weapons_magic(tad);
+    }
+    //Loot
+    tad.starting_gold = parseInt(tad.starting_gold/10);
+    loot_generate(tad);
+}
+function npc_equip_armor(tad){
+    let armor = [];
+    armor["None"]   = [];
+    armor["Light"]  = ["Padded Armor","Leather Armor","Studded Leather Armor"];
+    armor["Medium"] = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor"];
+    armor["Heavy"]  = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor","Ring Mail","Chain Mail","Splint Armor","Plate Armor"];
+    tad.armor = armor[tad.template.armor].random();
+
+    //Buy Armor with starting gold
+    if (tad.starting_gold > 24000){
+        tad.starting_gold -= 24000;
+        tad.armor += " +3";
+        //+3 weapon
+    } else if (tad.starting_gold > 6000){
+        //+2 Weapon
+        tad.starting_gold -= 6000;
+        tad.armor += " +2";
+    } else if (tad.starting_gold > 1500){
+        //+1 Weapon
+        tad.starting_gold -= 1500;
+        tad.armor += " +1";
+    }
+    tad.items_to_add_compendium.push(["dnd5e.items", tad.armor]);
+    if (tad.melee_handed == 1){
+        tad.shield = "Shield";
+        //Buy Armor with starting gold
+        if (tad.starting_gold > 24000){
+            tad.starting_gold -= 24000;
+            tad.shield += " +3";
+            //+3 weapon
+        } else if (tad.starting_gold > 6000){
+            //+2 Weapon
+            tad.starting_gold -= 6000;
+            tad.shield += " +2";
+        } else if (tad.starting_gold > 2000){
+            //+1 Weapon
+            tad.starting_gold -= 2000;
+            tad.shield += " +1";
+        }
+        tad.items_to_add_compendium.push(["dnd5e.items", tad.shield]);
+    }
+}
+function npc_equip_weapons_normal(tad){
+    //Get a melee and a range weapon
+    if (roll_simple(2) == 1){
+        tad.melee_handed = 1;
+        tad.weapon_1 = tad.template.weapons_1_handed.random();
+    } else {
+        tad.melee_handed = 2;
+        tad.weapon_1 = tad.template.weapons_2_handed.random();
+    }
+    if (roll_simple(2) == 1){
+        tad.weapon_2 = tad.template.weapons_1_handed_range.random();
+    } else {
+        tad.weapon_2 = tad.template.weapons_2_handed_range.random();
+    }
+}
+function npc_equip_weapons_magic(tad){
+    //Buy Weapon with starting gold
+    if (tad.starting_gold > 16000){
+        tad.starting_gold -= 16000;
+        if (roll_simple(2) == 1){
+            tad.weapon_1 += " +3";
+        } else {
+            tad.weapon_2 += " +3";
+        }
+        //+3 weapon
+    } else if (tad.starting_gold > 4000){
+        //+2 Weapon
+        tad.starting_gold -= 4000;
+        if (roll_simple(2) == 1){
+            tad.weapon_1 += " +2";
+        } else {
+            tad.weapon_2 += " +2";
+        }
+    } else if (tad.starting_gold > 1000){
+        //+1 Weapon
+        tad.starting_gold -= 1000;
+        if (roll_simple(2) == 1){
+            tad.weapon_1 += " +1";
+        } else {
+            tad.weapon_2 += " +1";
+        }
+    }
+    tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_1]);
+    tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_2]);
+}
+function npc_equip_misc_magic(tad){
+    //Scramble misc_items
+    tad.template.misc_magic.shuffle();
+    for (let item of tad.template.misc_magic){
+        if (item.price <= tad.starting_gold){
+            tad.items_to_add_compendium.push(["dnd5e.items", item.id]);
+            tad.starting_gold -= item.price;
+        }
     }
 
-
+}
+function npc_equip_loot(tad){
 
 }
+
 function party_level_average_get(){
     let party_count = 0;
     let party_level_total = 0;
@@ -735,6 +837,13 @@ async function template_choose(tad){
         case "wizard":
             template.class = "Wizard";
             template.abilities = ["con","dex","int"];
+            template.misc_magic = [
+                {id:"Amulet of Health",     price: 4000},
+                {id:"Boots of Speed",       price: 4000},
+                {id:"Headband of Intellect",price: 8000},
+                {id:"Ring of Protection",   price: 3500},
+                {id:"Ring of Warmth",       price: 1000}
+            ];
             template.spell_list = [
                 ["Chill Touch","Poison Spray","Ray of Frost"],
                 ["Burning Hands","Feather Fall","Mage Armor","Magic Missile","Sleep"],
@@ -916,4 +1025,15 @@ function l(logStr){
 Array.prototype.random = function () { 
     return this[Math.floor((Math.random()*this.length))];
 }
+Array.prototype.shuffle = function() {
+    var i = this.length, j, temp;
+    if ( i == 0 ) return this;
+    while ( --i ) {
+       j = Math.floor( Math.random() * ( i + 1 ) );
+       temp = this[i];
+       this[i] = this[j];
+       this[j] = temp;
+    }
+    return this;
+  }
 String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
