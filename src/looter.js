@@ -11,14 +11,6 @@
         * Sell selected items
             * Merchants never give full price
             * Re-Roll button
-        * Exclude non-magical items
-
-    * Functionality
-        * Copy all items to Chest then delete all items from NPC
-        * Stack Items = Yes
-        * Convert GP item loot to actual gold pieces in the chest
-        * Come up with way to spawn a chest when one does not exist with image
-        * Check for Loot Sheet 5e installation.
 
     ======================= Questions =======================
     ? Can we drag/drop items to/from merchant and have gp updated in source/destination token?
