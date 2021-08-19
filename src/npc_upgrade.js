@@ -55,6 +55,9 @@ async function main(opt){
 
     opt.tweak_factor = 1;
 
+    //Get 
+    let crdb = crdb_get();
+
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
         if (token.actor.type != "npc"){ continue; } //Skip it if it's not an npc
 
@@ -86,6 +89,7 @@ async function main(opt){
         tad.cr_orig = original_actorData.data.details.cr;
         if (tad.cr < 1){ tad.cr = 1; }
         tad.cr_new = tad.cr + tad.opt.cr_change;
+        tad.new_cr_str = tad.cr_new.toString();
         if (tad.cr_new < 1){ tad.cr_new = 1; }
         actorData_updates[AD+"details.cr"] = tad.cr_new;
         tad.cr_change_since_orig = Math.round(tad.cr_new - tad.cr_orig);
@@ -103,7 +107,6 @@ async function main(opt){
         tad.bio_traits.push(["Gender", tad.gender]);
 
         //Social Status, Luck
-        //tad.social_status = social_status_get(token,tad);
         tad.social_status = roll_bell_curve_1000(TADD.abilities.cha.mod * 2);
         tad.luck = roll_bell_curve_1000();
         tad.xp = experience_points_get(tad.cr_new);
@@ -136,10 +139,8 @@ async function main(opt){
 
         //HP Adjust
         if (opt.adjust_hp){
-            let hp = TADD.attributes.hp.max;
-            tad.hp = (tad.cr_new * NPC_HIT_DIE) + (parseInt((tad.con - 10) / 2) * tad.cr_new);
-            tad.bio_updates.push(["HP", original_actorData.data.attributes.hp.max, tad.hp]);
-            actorData_updates[AD+"attributes.hp.max"] = tad.hp;
+            tad.hp_max = roll_simple(crdb[tad.new_cr_str].hphi - crdb[tad.new_cr_str].hplo) + crdb[tad.new_cr_str].hplo;
+            actorData_updates[AD+"attributes.hp.max"] = tad.hp_max;
         }
 
         //Do some things based on humanoid/non-humanoid
@@ -219,7 +220,7 @@ async function main(opt){
             }
         }
 
-        
+        Add tad.log[] as an array of changes made to token.
 
         
         */
@@ -590,10 +591,6 @@ function npc_equip_misc_magic(tad){
     }
 
 }
-function npc_equip_loot(tad){
-
-}
-
 function party_level_average_get(){
     let party_count = 0;
     let party_level_total = 0;
@@ -907,3 +904,42 @@ Array.prototype.shuffle = function() {
     return this;
   }
 String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
+
+function crdb_get(){
+    let arr = [];
+    arr["0"] = {xp:10,prof:2,ac:13,hplo:0,hphi:6,att:3,damlo:0,damhi:1,sav:13};
+    arr["1/8"] = {xp:25,prof:2,ac:13,hplo:7,hphi:35,att:3,damlo:2,damhi:3,sav:13};
+    arr["1/4"] = {xp:50,prof:2,ac:13,hplo:36,hphi:49,att:3,damlo:4,damhi:5,sav:13};
+    arr["1/2"] = {xp:100,prof:2,ac:13,hplo:50,hphi:70,att:3,damlo:6,damhi:8,sav:13};
+    arr["1"] = {xp:200,prof:2,ac:13,hplo:71,hphi:85,att:3,damlo:9,damhi:14,sav:13};
+    arr["2"] = {xp:450,prof:2,ac:13,hplo:86,hphi:100,att:3,damlo:15,damhi:20,sav:13};
+    arr["3"] = {xp:700,prof:2,ac:13,hplo:101,hphi:115,att:4,damlo:21,damhi:26,sav:13};
+    arr["4"] = {xp:1100,prof:2,ac:14,hplo:116,hphi:130,att:5,damlo:27,damhi:32,sav:14};
+    arr["5"] = {xp:1800,prof:3,ac:15,hplo:131,hphi:145,att:6,damlo:33,damhi:38,sav:15};
+    arr["6"] = {xp:2300,prof:3,ac:15,hplo:146,hphi:160,att:6,damlo:39,damhi:44,sav:15};
+    arr["7"] = {xp:2900,prof:3,ac:15,hplo:161,hphi:175,att:6,damlo:45,damhi:50,sav:15};
+    arr["8"] = {xp:3900,prof:3,ac:16,hplo:176,hphi:190,att:7,damlo:51,damhi:56,sav:16};
+    arr["9"] = {xp:5000,prof:4,ac:16,hplo:191,hphi:205,att:7,damlo:57,damhi:62,sav:16};
+    arr["10"] = {xp:5900,prof:4,ac:17,hplo:206,hphi:220,att:7,damlo:63,damhi:68,sav:16};
+    arr["11"] = {xp:7200,prof:4,ac:17,hplo:221,hphi:235,att:8,damlo:69,damhi:74,sav:17};
+    arr["12"] = {xp:8400,prof:4,ac:17,hplo:236,hphi:250,att:8,damlo:75,damhi:80,sav:18};
+    arr["13"] = {xp:10000,prof:5,ac:18,hplo:251,hphi:265,att:8,damlo:81,damhi:86,sav:18};
+    arr["14"] = {xp:11500,prof:5,ac:18,hplo:266,hphi:280,att:8,damlo:87,damhi:92,sav:18};
+    arr["15"] = {xp:13000,prof:5,ac:18,hplo:281,hphi:295,att:8,damlo:93,damhi:98,sav:18};
+    arr["16"] = {xp:15000,prof:5,ac:18,hplo:296,hphi:310,att:9,damlo:99,damhi:104,sav:18};
+    arr["17"] = {xp:18000,prof:6,ac:19,hplo:311,hphi:325,att:10,damlo:105,damhi:110,sav:19};
+    arr["18"] = {xp:20000,prof:6,ac:19,hplo:326,hphi:340,att:10,damlo:111,damhi:116,sav:19};
+    arr["19"] = {xp:22000,prof:6,ac:19,hplo:341,hphi:355,att:10,damlo:117,damhi:122,sav:19};
+    arr["20"] = {xp:25000,prof:6,ac:19,hplo:356,hphi:400,att:10,damlo:123,damhi:140,sav:19};
+    arr["21"] = {xp:33000,prof:7,ac:19,hplo:401,hphi:445,att:11,damlo:141,damhi:158,sav:20};
+    arr["22"] = {xp:41000,prof:7,ac:19,hplo:446,hphi:490,att:11,damlo:159,damhi:176,sav:20};
+    arr["23"] = {xp:50000,prof:7,ac:19,hplo:491,hphi:535,att:11,damlo:177,damhi:194,sav:20};
+    arr["24"] = {xp:62000,prof:7,ac:19,hplo:536,hphi:580,att:11,damlo:195,damhi:212,sav:21};
+    arr["25"] = {xp:75000,prof:8,ac:19,hplo:581,hphi:625,att:12,damlo:213,damhi:230,sav:21};
+    arr["26"] = {xp:90000,prof:8,ac:19,hplo:626,hphi:670,att:12,damlo:231,damhi:248,sav:21};
+    arr["27"] = {xp:105000,prof:8,ac:19,hplo:671,hphi:715,att:13,damlo:249,damhi:266,sav:22};
+    arr["28"] = {xp:120000,prof:8,ac:19,hplo:716,hphi:760,att:13,damlo:267,damhi:284,sav:22};
+    arr["29"] = {xp:135000,prof:9,ac:19,hplo:760,hphi:805,att:13,damlo:285,damhi:302,sav:22};
+    arr["30"] = {xp:155000,prof:9,ac:19,hplo:805,hphi:850,att:14,damlo:303,damhi:320,sav:23};
+    return arr;
+}
