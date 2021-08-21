@@ -1,67 +1,34 @@
-crdb["0"] = {xp:10, prof:2, ac:13, hplo:1, hphi:6, att:3, damlo:0, damhi:1, sav:13}
-crdb["1/8"] = {xp:25, prof:2, ac:13, hplo:7, hphi:35, att:3, damlo:2, damhi:3, sav:13}
-crdb["1/4"] = {xp:50, prof:2, ac:13, hplo:36, hphi:49, att:3, damlo:4, damhi:5, sav:13}
-crdb["1/2"] = {xp:100, prof:2, ac:13, hplo:50, hphi:70, att:, damlo:, damhi:, sav:}
-crdb["1"] = {xp:200, prof:2, ac:13, hplo:71, hphi:85, att:, damlo:, damhi:, sav:}
-crdb["2"] = {xp:450, prof:2, ac:13, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["3"] = {xp:700, prof:2, ac:13, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["4"] = {xp:1100, prof:2, ac:14, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["5"] = {xp:1800, prof:3, ac:15, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["6"] = {xp:2300, prof:3, ac:15, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["7"] = {xp:2900, prof:3, ac:15, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["8"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["9"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["10"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["11"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["12"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["13"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["14"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["15"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["16"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["17"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["18"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["19"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["20"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["21"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["22"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["23"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["24"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["25"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["26"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["27"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["28"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["29"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-crdb["30"] = {xp:, prof:, ac:, hplo:, hphi:, att:, damlo:, damhi:, sav:}
-
-cr_hp["1/2	100	2	13	50-70	3	6-8	13
-cr_hp["1	200	2	13	71-85	3	9-14	13
-cr_hp["2	450	2	13	86-100	3	15-20	13
-cr_hp["3	700	2	13	101-115	4	21-26	13
-cr_hp["4	1,100	2	14	116-130	5	27-32	14
-cr_hp["5	1,800	3	15	131-145	6	33-38	15
-cr_hp["6	2,300	3	15	146-160	6	39-44	15
-cr_hp["7	2,900	3	15	161-175	6	45-50	15
-cr_hp["8	3,900	3	16	176-190	7	51-56	16
-cr_hp["9	5,000	4	16	191-205	7	57-62	16
-cr_hp["10	5,900	4	17	206-220	7	63-68	16
-cr_hp["11	7,200	4	17	221-235	8	69-74	17
-cr_hp["12	8,400	4	17	236-250	8	75-80	18
-cr_hp["13	10,000	5	18	251-265	8	81-86	18
-cr_hp["14	11,500	5	18	266-280	8	87-92	18
-cr_hp["15	13,000	5	18	281-295	8	93-98	18
-cr_hp["16	15,000	5	18	296-310	9	99-104	18
-cr_hp["17	18,000	6	19	311-325	10	105-110	19
-cr_hp["18	20,000	6	19	326-340	10	111-116	19
-cr_hp["19	22,000	6	19	341-355	10	117-122	19
-cr_hp["20	25,000	6	19	356-400	10	123-140	19
-cr_hp["21	33,000	7	19	401-445	11	141-158	20
-cr_hp["22	41,000	7	19	446-490	11	159-176	20
-cr_hp["23	50,000	7	19	491-535	11	177-194	20
-cr_hp["24	62,000	7	19	536-580	11	195-212	21
-cr_hp["25	75,000	8	19	581-625	12	213-230	21
-cr_hp["26	90,000	8	19	626-670	12	231-248	21
-cr_hp["27	105,000	8	19	671-715	13	249-266	22
-cr_hp["28	120,000	8	19	716-760	13	267-284	22
-cr_hp["29	135,000	9	19	760-805	13	285-302	22
-cr_hp["30	155,000	9	19	805-850	14	303-320	23
-
+    arr["0"] = {xp:10,prof:2,ac:13,hplo:0,hphi:6,att:3,damlo:0,damhi:1,sav:13};
+    arr["1/8"] = {xp:25,prof:2,ac:13,hplo:7,hphi:35,att:3,damlo:2,damhi:3,sav:13};
+    arr["1/4"] = {xp:50,prof:2,ac:13,hplo:36,hphi:49,att:3,damlo:4,damhi:5,sav:13};
+    arr["1/2"] = {xp:100,prof:2,ac:13,hplo:50,hphi:70,att:3,damlo:6,damhi:8,sav:13};
+    arr["1"] = {xp:200,prof:2,ac:13,hplo:71,hphi:85,att:3,damlo:9,damhi:14,sav:13};
+    arr["2"] = {xp:450,prof:2,ac:13,hplo:86,hphi:100,att:3,damlo:15,damhi:20,sav:13};
+    arr["3"] = {xp:700,prof:2,ac:13,hplo:101,hphi:115,att:4,damlo:21,damhi:26,sav:13};
+    arr["4"] = {xp:1100,prof:2,ac:14,hplo:116,hphi:130,att:5,damlo:27,damhi:32,sav:14};
+    arr["5"] = {xp:1800,prof:3,ac:15,hplo:131,hphi:145,att:6,damlo:33,damhi:38,sav:15};
+    arr["6"] = {xp:2300,prof:3,ac:15,hplo:146,hphi:160,att:6,damlo:39,damhi:44,sav:15};
+    arr["7"] = {xp:2900,prof:3,ac:15,hplo:161,hphi:175,att:6,damlo:45,damhi:50,sav:15};
+    arr["8"] = {xp:3900,prof:3,ac:16,hplo:176,hphi:190,att:7,damlo:51,damhi:56,sav:16};
+    arr["9"] = {xp:5000,prof:4,ac:16,hplo:191,hphi:205,att:7,damlo:57,damhi:62,sav:16};
+    arr["10"] = {xp:5900,prof:4,ac:17,hplo:206,hphi:220,att:7,damlo:63,damhi:68,sav:16};
+    arr["11"] = {xp:7200,prof:4,ac:17,hplo:221,hphi:235,att:8,damlo:69,damhi:74,sav:17};
+    arr["12"] = {xp:8400,prof:4,ac:17,hplo:236,hphi:250,att:8,damlo:75,damhi:80,sav:18};
+    arr["13"] = {xp:10000,prof:5,ac:18,hplo:251,hphi:265,att:8,damlo:81,damhi:86,sav:18};
+    arr["14"] = {xp:11500,prof:5,ac:18,hplo:266,hphi:280,att:8,damlo:87,damhi:92,sav:18};
+    arr["15"] = {xp:13000,prof:5,ac:18,hplo:281,hphi:295,att:8,damlo:93,damhi:98,sav:18};
+    arr["16"] = {xp:15000,prof:5,ac:18,hplo:296,hphi:310,att:9,damlo:99,damhi:104,sav:18};
+    arr["17"] = {xp:18000,prof:6,ac:19,hplo:311,hphi:325,att:10,damlo:105,damhi:110,sav:19};
+    arr["18"] = {xp:20000,prof:6,ac:19,hplo:326,hphi:340,att:10,damlo:111,damhi:116,sav:19};
+    arr["19"] = {xp:22000,prof:6,ac:19,hplo:341,hphi:355,att:10,damlo:117,damhi:122,sav:19};
+    arr["20"] = {xp:25000,prof:6,ac:19,hplo:356,hphi:400,att:10,damlo:123,damhi:140,sav:19};
+    arr["21"] = {xp:33000,prof:7,ac:19,hplo:401,hphi:445,att:11,damlo:141,damhi:158,sav:20};
+    arr["22"] = {xp:41000,prof:7,ac:19,hplo:446,hphi:490,att:11,damlo:159,damhi:176,sav:20};
+    arr["23"] = {xp:50000,prof:7,ac:19,hplo:491,hphi:535,att:11,damlo:177,damhi:194,sav:20};
+    arr["24"] = {xp:62000,prof:7,ac:19,hplo:536,hphi:580,att:11,damlo:195,damhi:212,sav:21};
+    arr["25"] = {xp:75000,prof:8,ac:19,hplo:581,hphi:625,att:12,damlo:213,damhi:230,sav:21};
+    arr["26"] = {xp:90000,prof:8,ac:19,hplo:626,hphi:670,att:12,damlo:231,damhi:248,sav:21};
+    arr["27"] = {xp:105000,prof:8,ac:19,hplo:671,hphi:715,att:13,damlo:249,damhi:266,sav:22};
+    arr["28"] = {xp:120000,prof:8,ac:19,hplo:716,hphi:760,att:13,damlo:267,damhi:284,sav:22};
+    arr["29"] = {xp:135000,prof:9,ac:19,hplo:760,hphi:805,att:13,damlo:285,damhi:302,sav:22};
+    arr["30"] = {xp:155000,prof:9,ac:19,hplo:805,hphi:850,att:14,damlo:303,damhi:320,sav:23};

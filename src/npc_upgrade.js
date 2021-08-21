@@ -33,6 +33,8 @@
 
     * Hover information for options
 
+    //Add tad.log[] as an array of changes made to token.
+
 */
 console.clear();
 
@@ -40,9 +42,6 @@ console.clear();
 const ABILITY_LEVEL_PER_PLUS = 3;
 const GEM_BASE_PERCENT = 50;
 const LEVEL_PER_PLUS_ARMOR_SHIELD_WEAPON = 16;
-//const LEVEL_PER_PLUS_ARMOR = 10;
-//const LEVEL_PER_PLUS_SHIELD = 10;
-//const LEVEL_PER_PLUS_WEAPON = 10;
 const NPC_HIT_DIE = 12;
 const TAB = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
@@ -55,7 +54,7 @@ async function main(opt){
 
     opt.tweak_factor = 1;
 
-    //Get 
+    //Load in some data
     let crdb = crdb_get();
 
     for (let token of canvas.tokens.controlled){    //Loop through all selected tokens
@@ -66,6 +65,7 @@ async function main(opt){
 
         //Setup temp array for processing current token
         let tad  = [];
+        tad.actorData_updates = [];
         tad.bio_narrative = [];
         tad.bio_traits = [];
         tad.bio_updates = [];
@@ -81,7 +81,7 @@ async function main(opt){
         let actorData_updates = [];
         if (!original_actorData){
             original_actorData = await token.actor.data;
-            actorData_updates["actorData.data.original_actorData"] = original_actorData;
+            tad.actorData_updates["actorData.data.original_actorData"] = original_actorData;
         }
 
         //Scale basic token info
@@ -91,7 +91,7 @@ async function main(opt){
         tad.cr_new = tad.cr + tad.opt.cr_change;
         tad.new_cr_str = tad.cr_new.toString();
         if (tad.cr_new < 1){ tad.cr_new = 1; }
-        actorData_updates[AD+"details.cr"] = tad.cr_new;
+        tad.actorData_updates[AD+"details.cr"] = tad.cr_new;
         tad.cr_change_since_orig = Math.round(tad.cr_new - tad.cr_orig);
 
         //Misc Token info
@@ -124,56 +124,69 @@ async function main(opt){
         if (tad.opt.adjust_abilities){
             for (let ability of tad.template.abilities){
                 let orig_ability = original_actorData.data.abilities[ability].value;
-                
-                console.log("orig ability: " + ability + " : " + orig_ability);
-                
                 let new_value = orig_ability + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
-                actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
+                tad.actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
                 tad.bio_updates.push([ability.capitalize(), orig_ability, new_value]);
-                if (ability == "con"){ tad.con = new_value; }
+                //if (ability == "con"){ tad.con = new_value; }
             }
         }
 
-        //Clear AC Flat Value
-        actorData_updates[AD+"attributes.ac.flat"] = null;
-
         //HP Adjust
         if (opt.adjust_hp){
-            tad.hp_max = roll_simple(crdb[tad.new_cr_str].hphi - crdb[tad.new_cr_str].hplo) + crdb[tad.new_cr_str].hplo;
-            actorData_updates[AD+"attributes.hp.max"] = tad.hp_max;
+            //tad.hp_max = roll_simple(crdb[tad.new_cr_str].hphi - crdb[tad.new_cr_str].hplo) + crdb[tad.new_cr_str].hplo;
+            tad.hp_max = roll_lo_hi(crdb[tad.new_cr_str].hplo, crdb[tad.new_cr_str].hphi);
+            tad.actorData_updates[AD+"attributes.hp.max"] = tad.hp_max;
         }
 
-        //Do some things based on humanoid/non-humanoid
-        if (!tad.is_humanoid){
+        //Humanoid vs Non-Humanoid updates
+        if (tad.is_humanoid){
+            //Armor Class - Humanoid
+            tad.actorData_updates[AD+"attributes.ac.flat"] = null;
+            tad.actorData_updates[AD+"attributes.ac.calc"] = "default";
+
+            //Flag some item types to be deleted from inventory
+            if (tad.opt.clear_armor){    tad.item_types_to_delete.push("equipment"); }
+            if (tad.opt.clear_spells){   tad.item_types_to_delete.push("spell"); }
+            if (tad.opt.clear_weapons){  tad.item_types_to_delete.push("weapon"); }
+
+            //Flag some individual items to be deleted
+            for (let item of token.actor.items){
+                if (item.name.indexOf("Multiattack")>-1){
+                    tad.items_to_delete.push(item._id);
+                }
+            }
+
+            //Does multi-Attack need added?
+            if (tad.template.has_multiattack){
+                if (tad.cr_new > 2){
+                    if (tad.cr_new > 11){
+                        feat_add_queue(tad, "Multiattack (3 Attacks)", "The NPC gets 3 melee attacks.");
+                    } else {
+                        feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
+                    }
+                }
+            }
+
+            npc_equip(tad); 
+        } else {
+            //Armor Class - Non-Humanoid
+            tad.actorData_updates[AD+"attributes.ac.calc"] = "natural";
+            tad.actorData_updates[AD+"attributes.ac.flat"] = crdb[tad.new_cr_str].ac;
+            //tad.actorData_updates[AD+"attributes.ac.base"] = crdb[tad.new_cr_str].ac;
+
             //Movement Adjust: Adjust up or down by 1 foot per CR 
             for (let m of ["burrow","climb","fly","swim","walk"]){
                 console.log(original_actorData);
                 let cur_m = original_actorData.data.attributes.movement[m];
                 if (cur_m > 0){
                     tad.movement[m] = Math.round(cur_m + tad.cr_new);
-                    actorData_updates[AD+"attributes.movement." + m] = tad.movement[m];
+                    tad.actorData_updates[AD+"attributes.movement." + m] = tad.movement[m];
                     tad.bio_updates.push([m.capitalize(), cur_m + "'", tad.movement[m] + "'"])
                 }
             }
-        } else {
-            console.log("Is Humanoid");
-            if (tad.opt.clear_armor){    tad.item_types_to_delete.push("equipment"); }
-            if (tad.opt.clear_spells){   tad.item_types_to_delete.push("spell"); }
-            if (tad.opt.clear_weapons){  tad.item_types_to_delete.push("weapon"); }
-        }
 
-        //NPC Equip
-        if (tad.is_humanoid){ npc_equip(tad); }
-
-        /*
-        //Items Adjust
-        tad.has_armor = false
-        tad.has_shield = false;
-        tad.has_weapon = false;
-        for (let item of token.actor.items){
-            
-                
-            } else {
+            //Items Adjust
+            for (let item of token.actor.items){
                 //console.log("Non-Humanoid");
                 if (item.type === "weapon"){
                     tad.items_updates = [];
@@ -195,7 +208,7 @@ async function main(opt){
                     let d = parseInt(original_damage.substr(0,dPos));
                     if (d > 0){
                         //console.log("D: " + d);
-                        let newD = d + Math.round(tad.cr_change_since_orig/2);
+                        let newD = d + Math.round(tad.cr_change_since_orig); //Removed /2 to increase damage
                         //console.log("newD: " + newD);
                         if (d + newD < 0){ newD = 1; }
                         let new_damage = newD + original_damage.substr(dPos,1000);
@@ -213,29 +226,6 @@ async function main(opt){
                     await token.actor.updateEmbeddedDocuments("Item", tad.items_updates);
                 }
             }
-            if (item.type === "feat"){
-                if (is_humanoid && tad.template.has_multiattack && item.name.indexOf("Multiattack") > -1){
-                    await token.actor.deleteEmbeddedDocuments( "Item", [item.id] );
-                }
-            }
-        }
-
-        Add tad.log[] as an array of changes made to token.
-
-        
-        */
-
-        //Does multi-Attack need added?
-        if (is_humanoid && tad.template.has_multiattack){
-            if (tad.cr_new > 2){
-                if (tad.cr_new > 11){
-                    feat_add_queue(tad, "Multiattack (3 Attacks)", "The NPC gets 3 melee attacks.");
-                } else {
-                    feat_add_queue(tad, "Multiattack (2 Attacks)", "The NPC gets 2 melee attacks.");
-                }
-            }
-        } else {
-            // No need to touch or add multiattacks for Non-Humanoids!!!
         }
 
         //Add spells for spellcasters
@@ -245,7 +235,7 @@ async function main(opt){
                     tad.items_to_add_compendium.push(["dnd5e.spells", spell]);
                 }
             }
-            actorData_updates[AD+"details.spellLevel"] = tad.cr_new;
+            tad.actorData_updates[AD+"details.spellLevel"] = tad.cr_new;
         }
 
         //Update biography
@@ -253,12 +243,12 @@ async function main(opt){
             console.log("Before Biography Update");
         
         await biography_update(tad);
-        actorData_updates[AD+"details.biography.value"] = tad.bio;
+        tad.actorData_updates[AD+"details.biography.value"] = tad.bio;
 
             console.log("After Biography Update");
             console.log("Before Token.document.update");
 
-        await token.document.update(actorData_updates);
+        await token.document.update(tad.actorData_updates);
             console.log("After Token.document.update");
             console.log("Before item_types_remove");
         
@@ -305,7 +295,8 @@ async function main(opt){
     //armor.push("Splint Armor");             // 17 11
     //armor.push("Plate Armor");              // 18 12
 
-    async function biography_update(tad){
+
+async function biography_update(tad){
     tad.bio += "<table border=0 cellpadding=0 cellspacing=0 width=100%>";
     tad.bio += "<tr><td valign=top width=50%>";
     tad.bio += "        <table border=0 cellpadding=0 cellspacing=0>"
@@ -494,6 +485,7 @@ function npc_equip(tad){
     loot_generate(tad);
 }
 function npc_equip_armor(tad){
+    //We are giving PCs base level armor for free
     let armor = [];
     armor["None"]   = [];
     armor["Light"]  = ["Padded Armor","Leather Armor","Studded Leather Armor"];
@@ -620,6 +612,9 @@ function roll_bell_curve_1000(adder = 0){
         case (roll<997): return 2.00; //981-996     16/1000  =  1.6%
         default:         return 4.00; //997-1000    4/1000   =  0.4%
     }
+}
+function roll_lo_hi(lo, hi){
+    return roll_simple(hi - lo + 1) + lo - 1;
 }
 function roll_simple(d){
     return Math.floor(Math.random() * d) + 1
