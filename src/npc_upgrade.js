@@ -27,6 +27,9 @@
         Shield:   [ ] Allow Shield  [CR / +]
         Magic Items [ ] 
 
+
+        GP/CR for Armor/Magic Items/Shield/Weapons [Dropdown] 
+
         Use Luck [ ]
         Use Social Status [ ]
 
@@ -63,26 +66,17 @@ async function main(opt){
         let AD   = "actorData.data.";                       //Used for WRITING data to token. Foundry Data
         let TADD = token.actor.data.data;                   //Used for READING data from token. Foundry Data
 
-        //Setup temp array for processing current token
-        let tad  = [];
-        tad.actorData_updates = [];
-        tad.bio_narrative = [];
-        tad.bio_traits = [];
-        tad.bio_updates = [];
-        tad.item_types_to_delete = [];
-        tad.items_to_add_compendium = [];
-        tad.items_to_add_raw = [];
-        tad.items_to_delete = [];
-        tad.movement = [];
-        tad.opt = opt;
+        //Setup tad (Token Actor Data) object
+        let tad = new Token_Actor_Data(token, opt);
+        
 
         //Get/set original data
         let original_actorData = TADD.original_actorData;
-        let actorData_updates = [];
         if (!original_actorData){
             original_actorData = await token.actor.data;
             tad.actorData_updates["actorData.data.original_actorData"] = original_actorData;
         }
+        tad.log("After set original data");
 
         //Scale basic token info
         tad.cr = TADD.details.cr;
@@ -107,13 +101,21 @@ async function main(opt){
         tad.bio_traits.push(["Gender", tad.gender]);
 
         //Social Status, Luck
-        tad.social_status = roll_bell_curve_1000(TADD.abilities.cha.mod * 2);
-        tad.luck = roll_bell_curve_1000();
+        if (opt.use_luck){
+            tad.luck = roll_bell_curve_1000();
+        } else {
+            tad.luck = 1;
+        }
+        if (opt.use_social_status){
+            tad.social_status = roll_bell_curve_1000(TADD.abilities.cha.mod * 2);
+        } else {
+            tad.social_status = 1;
+        }
         tad.xp = experience_points_get(tad.cr_new);
         tad.adjusted_cr = Math.round(tad.cr_new * tad.social_status * tad.luck);    //Rounds up if >= 0.5
         tad.bio_traits.push(["Luck factor", tad.luck]);
         tad.bio_traits.push(["Social Status factor", tad.social_status]);
-        tad.starting_gold = (Math.round((tad.xp/2) * opt.tweak_factor * tad.social_status * tad.luck)) + roll_simple(tad.adjusted_cr);
+        tad.starting_gold = (Math.round((tad.xp/2) * opt.gpcr_factor * tad.social_status * tad.luck)) + roll_simple(tad.adjusted_cr);
         l(tad);
 
         //Read in template
@@ -121,22 +123,18 @@ async function main(opt){
 
         //Abilities Adjust
         tad.con = original_actorData.data.abilities.con.value;
-        if (tad.opt.adjust_abilities){
-            for (let ability of tad.template.abilities){
-                let orig_ability = original_actorData.data.abilities[ability].value;
-                let new_value = orig_ability + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
-                tad.actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
-                tad.bio_updates.push([ability.capitalize(), orig_ability, new_value]);
-                //if (ability == "con"){ tad.con = new_value; }
-            }
+        for (let ability of tad.template.abilities){
+            let orig_ability = original_actorData.data.abilities[ability].value;
+            let new_value = orig_ability + Math.round(tad.cr_change_since_orig/ABILITY_LEVEL_PER_PLUS);
+            tad.actorData_updates[AD+"abilities." + ability + ".value"] = new_value;
+            tad.bio_updates.push([ability.capitalize(), orig_ability, new_value]);
+            //if (ability == "con"){ tad.con = new_value; }
         }
 
         //HP Adjust
-        if (opt.adjust_hp){
-            //tad.hp_max = roll_simple(crdb[tad.new_cr_str].hphi - crdb[tad.new_cr_str].hplo) + crdb[tad.new_cr_str].hplo;
-            tad.hp_max = roll_lo_hi(crdb[tad.new_cr_str].hplo, crdb[tad.new_cr_str].hphi);
-            tad.actorData_updates[AD+"attributes.hp.max"] = tad.hp_max;
-        }
+        //tad.hp_max = roll_simple(crdb[tad.new_cr_str].hphi - crdb[tad.new_cr_str].hplo) + crdb[tad.new_cr_str].hplo;
+        tad.hp_max = roll_lo_hi(crdb[tad.new_cr_str].hplo, crdb[tad.new_cr_str].hphi);
+        tad.actorData_updates[AD+"attributes.hp.max"] = tad.hp_max;
 
         //Humanoid vs Non-Humanoid updates
         if (tad.is_humanoid){
@@ -145,9 +143,9 @@ async function main(opt){
             tad.actorData_updates[AD+"attributes.ac.calc"] = "default";
 
             //Flag some item types to be deleted from inventory
-            if (tad.opt.clear_armor){    tad.item_types_to_delete.push("equipment"); }
-            if (tad.opt.clear_spells){   tad.item_types_to_delete.push("spell"); }
-            if (tad.opt.clear_weapons){  tad.item_types_to_delete.push("weapon"); }
+            tad.item_types_to_delete.push("equipment");
+            tad.item_types_to_delete.push("spell");
+            tad.item_types_to_delete.push("weapon");
 
             //Flag some individual items to be deleted
             for (let item of token.actor.items){
@@ -336,7 +334,7 @@ function gender_get(){
     return ["Male","Female"].random();
 }
 function is_humanoid(tad){
-    if (["celestial","fiend","fey","giant","humanoid"].includes(tad.type.toLowerCase()) || ["centaur","drider","ghast","ghoul","lich","medusa","merrow","minotaur","minotaur skeleton","mummy lord","ogre zombie","skeleton","vampire","vampire spawn","wight","zombie"].includes(tad.name.toLowerCase())){
+    if (["celestial","fey","giant","humanoid"].includes(tad.type.toLowerCase()) || ["centaur","drider","ghast","ghoul","lich","medusa","merrow","minotaur","minotaur skeleton","mummy lord","ogre zombie","skeleton","vampire","vampire spawn","wight","zombie"].includes(tad.name.toLowerCase())){
         return true;
     } else {
         return false;
@@ -797,17 +795,36 @@ function dialog_start(){
                     </select>
                 </div>
                 <hr>
+                <div class="form-group">
+                    <label>GP/CR Factor:</label>
+                    <select id="gpcr_factor" name="gpcr_factor">
+                        <option value="0">-100% (No GP!)</option>
+                        <option value=".25">25%</option>
+                        <option value=".50">50%</option>
+                        <option value=".75">75%</option>
+                        <option value="1" selected>100% : GP = (XP/2)</option>
+                        <option value="1.25">125%</option>
+                        <option value="1.50">150%</option>
+                        <option value="1.75">175%</option>
+                        <option value="2">200%</option>
+                        <option value="3">300%</option>
+                    </select>
+                </div>
+                <hr>
+                <div class="form-group">    <div id='label_luck' style='cursor:pointer;'>Use Luck:</div>          <input id='use_luck' type='checkbox' checked /></div>
+                <div class="form-group">    <div id='label_social_status'>Use Social Status:</div> <input id='use_social_status' type='checkbox' checked /></div>
+                
 
-                <!-- re-insert template chooser here-->
+                <!-- re-insert template chooser here
 
                 <center><div>NPC Adjustments</div></center>
                 <div class="form-group">    <label>Abilities:</label>     <input id='adjust_abilities' type='checkbox' checked /></div>
-                <!--<div class="form-group">    <label>Age:</label>       <input id='adjust_age' type='checkbox' checked /></div>-->
+                
                 <div class="form-group">    <label>Armor:</label>         <input id='adjust_armor' type='checkbox' checked /></div>
                 <div class="form-group">    <label>HP:</label>            <input id='adjust_hp' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Loot:</label>          <input id='adjust_loot' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Movement:</label>      <input id='adjust_movement' type='checkbox' checked /></div>
-                <!--<div class="form-group">    <label>Size:</label>      <input id='adjust_size' type='checkbox' checked /></div>-->
+                
                 <div class="form-group">    <label>Spells:</label>        <input id='adjust_spells' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Weapons:</label>       <input id='adjust_weapons' type='checkbox' checked /></div>
                 <hr>
@@ -816,63 +833,71 @@ function dialog_start(){
                 <div class="form-group">    <label>Features:</label><input id='feature_clear' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Spells:</label>  <input id='spells_clear' type='checkbox' checked /></div>
                 <div class="form-group">    <label>Weapons:</label> <input id='weapons_clear' type='checkbox' checked /></div>
+                -->
             </form>
         `,
-      buttons: {
-        upgrade: {
-          icon: "<i class='fas fa-check'></i>",
-          label: "Full Upgrade",
-          callback: () => {
-              //Get all options from Form
-              let opt = [];
-              let e = document.getElementById("scale-npc-cr");
-              opt.cr_change = parseInt(e.options[e.selectedIndex].value);
-              
-              //console.log("opt.cr_change: " + opt.cr_change);
-              
-              //e = document.getElementById("npc_template");
-              //opt.template = e.options[e.selectedIndex].value;
-              opt.template = "generic";
-
-              opt.adjust_abilities = document.getElementById("adjust_abilities").checked
-              //opt.adjust_ac        = document.getElementById("adjust_ac").checked
-              opt.adjust_armor     = document.getElementById("adjust_armor").checked
-              opt.adjust_hp        = document.getElementById("adjust_hp").checked
-              opt.adjust_loot      = document.getElementById("adjust_loot").checked
-              opt.adjust_movement  = document.getElementById("adjust_movement").checked
-              opt.adjust_spells    = document.getElementById("adjust_spells").checked
-              opt.adjust_weapons   = document.getElementById("adjust_weapons").checked
-
-              opt.clear_armor      = document.getElementById("armor_clear").checked
-              opt.clear_features   = document.getElementById("armor_clear").checked
-              opt.clear_spells     = document.getElementById("spells_clear").checked
-              opt.clear_weapons    = document.getElementById("weapons_clear").checked
-
-              main(opt);
-              d.render(true);
-          }
-        },
-        loot: {
+        buttons: {
+            upgrade: {
             icon: "<i class='fas fa-check'></i>",
-            label: "Loot Only",
+            label: "Full Upgrade",
             callback: () => {
+                //Get all options from Form
                 let opt = [];
-                opt.cr_change = 0;
-                opt.adjust_armor = false;
-                opt.adjust_hp = false;
-                opt.adjust_loot = true;
-                opt.adjust_movement = false;
-                opt.adjust_spells = false
-                opt.adjust_weapons = false;
-                opt.clear_armor = false;
-                opt.clear_features = false;
-                opt.clear_spells = false;
-                opt.clear_weapons = false;
+                let e = document.getElementById("scale-npc-cr");
+                opt.cr_change = parseInt(e.options[e.selectedIndex].value);
+                e = document.getElementById("gpcr_factor");
+                opt.gpcr_factor = parseFloat(e.options[e.selectedIndex].value);
+                //e = document.getElementById("npc_template");
+                //opt.template = e.options[e.selectedIndex].value;
+                opt.use_luck          = document.getElementById("use_luck").checked
+                opt.use_social_status = document.getElementById("use_social_status").checked
+                opt.template = "generic";
+
+                //opt.adjust_abilities = document.getElementById("adjust_abilities").checked
+                //opt.adjust_ac        = document.getElementById("adjust_ac").checked
+                //opt.adjust_armor     = document.getElementById("adjust_armor").checked
+                //opt.adjust_hp        = document.getElementById("adjust_hp").checked
+                //opt.adjust_loot      = document.getElementById("adjust_loot").checked
+                //opt.adjust_movement  = document.getElementById("adjust_movement").checked
+                //opt.adjust_spells    = document.getElementById("adjust_spells").checked
+                //opt.adjust_weapons   = document.getElementById("adjust_weapons").checked
+
+                //opt.clear_armor      = document.getElementById("armor_clear").checked
+                //opt.clear_features   = document.getElementById("armor_clear").checked
+                //opt.clear_spells     = document.getElementById("spells_clear").checked
+                //opt.clear_weapons    = document.getElementById("weapons_clear").checked
+
                 main(opt);
                 d.render(true);
+                $("#label_luck").attr('title', 'This is Luck tooltip');
+                $("#label_social_status").attr('title', 'This is Social Status tooltip');
             }
+            },
+            loot: {
+                icon: "<i class='fas fa-check'></i>",
+                label: "Loot Only",
+                callback: () => {
+                    let opt = [];
+                    opt.cr_change = 0;
+                    opt.adjust_armor = false;
+                    opt.adjust_hp = false;
+                    opt.adjust_loot = true;
+                    opt.adjust_movement = false;
+                    opt.adjust_spells = false
+                    opt.adjust_weapons = false;
+                    opt.clear_armor = false;
+                    opt.clear_features = false;
+                    opt.clear_spells = false;
+                    opt.clear_weapons = false;
+                    main(opt);
+                    d.render(true);
+                }
+            }
+        },
+        render: () => {
+            console.log("After Render!!!");
+            $("#label_luck").attr('title', 'Luck \n\n\n\n\n\n\n Tooltip');
         }
-      }
     }).render(true);
 }
 function log(group, logStr){
@@ -899,6 +924,10 @@ Array.prototype.shuffle = function() {
     return this;
   }
 String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
+
+function ardb_get(isGiant){
+    
+}
 
 function crdb_get(){
     let arr = [];
@@ -938,3 +967,28 @@ function crdb_get(){
     arr["30"] = {xp:155000,prof:9,ac:19,hplo:805,hphi:850,att:14,damlo:303,damhi:320,sav:23};
     return arr;
 }
+
+class Token_Actor_Data {
+    actorData_updates = [];
+    bio_narrative = [];
+    bio_traits = [];
+    bio_updates = [];
+    item_types_to_delete = [];
+    items_to_add_compendium = [];
+    items_to_add_raw = [];
+    items_to_delete = [];
+    events = [];
+    movement = [];
+
+    constructor(token, opt){
+        this.opt = opt;
+        //let AD   = "actorData.data.";                       //Used for WRITING data to token. Foundry Data
+        //let TADD = token.actor.data.data;                   //Used for READING data from token. Foundry Data
+
+
+    }
+    log(logStr){
+        this.events.push(logStr);
+    }
+}
+
