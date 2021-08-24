@@ -926,8 +926,9 @@ Array.prototype.shuffle = function() {
 String.prototype.capitalize = function () { return this.trim().toLowerCase().replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase()))); }
 
 function ardb_get(isGiant){
-    
+
 }
+
 
 function crdb_get(){
     let arr = [];
@@ -966,6 +967,10 @@ function crdb_get(){
     arr["29"] = {xp:135000,prof:9,ac:19,hplo:760,hphi:805,att:13,damlo:285,damhi:302,sav:22};
     arr["30"] = {xp:155000,prof:9,ac:19,hplo:805,hphi:850,att:14,damlo:303,damhi:320,sav:23};
     return arr;
+}
+
+class armor = {
+    
 }
 
 class Token_Actor_Data {
