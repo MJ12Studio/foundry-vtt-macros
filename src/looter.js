@@ -195,6 +195,23 @@ function dialog_main(){
             <br>
             <p><hr></p>
             <center><div id='div_statusbar'>....</div></center><hr>
+            <hr>
+            <div>
+                <table border=0 cellpadding=0 cellspacing=0>
+                    <tr>
+                        <td width='50px'>Sell%</td>
+                        <td width='250px'>
+                            <input type="range" id="sell_percent" name="sell_percent"
+                                min="10" max="200" step="10" value="100" onchange="
+                                    let elem = document.getElementById('sell_percent_value');
+                                    elem.innerHTML = '&nbsp;&nbsp;' + this.value + '%';
+                            ">
+                        </td>
+                        <td><div id='sell_percent_value'>&nbsp;&nbsp;100%</div></td>
+                    </tr>
+                </table>
+                
+            </div>
         `,
         buttons: {
             one: {
@@ -218,6 +235,16 @@ function dialog_main(){
                     if (window.confirm("Do you really want to clear out chest?")) {
                         chest_clear();
                     }
+                }
+            },
+            four: {
+                label: "Sell",
+                callback: () => {
+                    d.render(true);
+                    //if (window.confirm("Do you really want to clear out chest?")) {
+                        let value = document.getElementById('sell_percent').value;
+                        console.log("Sell Percent: " + value);
+                    //}
                 }
             }
         }

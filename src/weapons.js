@@ -262,3 +262,70 @@ weapon["Whip +1"]={2h:false,dam:"1d4 + @mod +1",dam_type:"slashing",heavy:false,
 weapon["Whip +2"]={2h:false,dam:"1d4 + @mod +2",dam_type:"slashing",heavy:false,price:4000,range:10,range_long:null,reach:true,type:"martialM",weight:3};
 weapon["Whip +3"]={2h:false,dam:"1d4 + @mod +3",dam_type:"slashing",heavy:false,price:16000,range:10,range_long:null,reach:true,type:"martialM",weight:3};
 weapon["Wooden Staff"]={2h:false,dam:"1d6 + @mod",dam_type:"bludgeoning",heavy:false,price:5,range:5,range_long:null,reach:false,type:"simpleM",weight:4};
+
+
+        CR  Ht  Str
+Cloud   9   24  27
+Fire    9   18  25
+Frost   8   21  23
+Hill    5   16  21
+Stone   7   18  23
+Storm   13  26  29
+
+Ettin
+Ogre
+
+weapon["Giant Axe (xs)"] = {type:"giant", min_str:10, dam: "1d12 +@mod"};
+weapon["Giant Axe (sm)"] = {type:"giant", min_str:15, dam: "2d12 +@mod"};
+weapon["Giant Axe (m)"] =  {type:"giant", min_str:20, dam: "3d12 +@mod"};
+weapon["Giant Axe (lg)"] = {type:"giant", min_str:22, dam: "4d12 +@mod"};
+weapon["Giant Axe (xl)"] = {type:"giant", min_str:25, dam: "5d12 +@mod"};
+
+weapon["Fiendish Axe (xs)"] = {type:"fiend", min_str:10, dam: "1d12 +@mod"};
+
+
+Choose Giant Weapon
+Giant Axe
+Giant Club
+Giant Morningstar
+Giant Sword
+
+Giant Crossbow
+Giant Longbow
+
+Choose Scale of Giant Weapon
+Weapon Name  S     M     L     XL
+Giant Axe    3d12, 4d12, 5d12, 6d12
+Giant Club   3d8,  4d8,  5d8,  6d8
+Giant Sword  3d6,  4d6,  5d6,  6d6 
+
+
+Choose +1/+2/+3
+
+[GiantSword, Giant Mace, Giant Maul] 3d6 min_ht min_str 500GP
+
+GiantSword 4d6 ............... 500GP
+
+GiantSword 5d6 ................ 500GP
+
+
+
+
+
+Weapon (longsword, mace, etc)
+    buy a +1, +2, +3
+
+
+
+
+
+    buy
+        of wounding
+        of light
+
+
+
+
+
+
+
