@@ -451,10 +451,10 @@ async function loot_generate(tad){
     //Simple loot uses svg icons; Magic loot uses full color icons
 
     if (gem_value > 0){
-        loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, parseInt(gem_value/gem_qty), "icons/svg/item-bag.svg");
+        loot_add_queue(tad, "Gems (" + gem_value + " gp value)", gem_qty, parseInt(gem_value/gem_qty), "icons/commodities/gems/gem-faceted-cushion-teal-black.webp");
     }
     if (gp_value > 0){
-        loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, 1, "icons/svg/coins.svg");
+        loot_add_queue(tad, "Gold Pieces (" + gp_value + ")", gp_value, 1, "icons/commodities/currency/coins-plain-stack-gold.webp");
     }
 }
 function npc_count_get(){
@@ -470,29 +470,30 @@ function npc_equip(tad){
     /*Figure out what items a NPC has based on their starting_gold */
     switch(tad.template.class){
         case "Fighter":
-            npc_equip_weapons_get_base(tad);
-            npc_equip_weapons_add_magic(tad);
+            npc_equip_base_weapons_get(tad);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_1);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_2);
             npc_equip_armor(tad);
+            npc_equip_shield(tad);
             break;
         case "Cleric":
-            npc_equip_weapons_get_base(tad);
+            npc_equip_base_weapons_get(tad);
             npc_equip_weapons_add_magic(tad);
             npc_equip_armor(tad);
+            npc_equip_shield(tad);
             break;
         case "Wizard":
-            npc_equip_weapons_get_base(tad);
+            npc_equip_base_weapons_get(tad);
             npc_equip_misc_magic(tad);
             npc_equip_weapons_add_magic(tad);
     }
 
     //Equip NPC Weapons
     if (tad.creature_type === "giant"){
-        tad.weapon_1.db = weapondb_get(tad.weapon_1.base);                      //Lookup base weapon info
-        tad.weapon_2.db = weapondb_get(tad.weapon_2.base);
         weapon_special_scale_giant_str(tad.weapon_1, tad.attributes["str"]);    //Scale weapons based on giant str
         weapon_special_scale_giant_str(tad.weapon_2, tad.attributes["str"]);
-        weapon_special_add(tad, tad.weapon_1);                                  //Add weapons
-        weapon_special_add(tad, tad.weapon_2);
+        weapon_special_add_queue(tad, tad.weapon_1);                            //Add weapons to queue
+        weapon_special_add_queue(tad, tad.weapon_2);
     } else {
         tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_1]);        //Add standard weapons from SRD Items
         tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_2]);
@@ -511,13 +512,15 @@ function weapon_special_scale_giant_str(weapon, str){
     if (str > 22){ weapon.add_dam_die = 4; weapon.scale = "xl"; }
     if (str > 25){ weapon.add_dam_die = 5; weapon.scale = "xxl"; }
 
-    let wdb = weapondb_get(weapon.base);
     weapon.dam = weapon.db.dam;
     weapon.die_count = parseInt(weapon.dam.substring(0,1)) + weapon.add_dam_die;
-    weapon.new_dam = string(weapon.die_count) + weapon.dam.substring(1,100);
+
+    console.log(weapon);
+
+    weapon.new_dam = weapon.die_count.toString() + weapon.dam.substring(1,100);
     weapon.name += " (" + weapon.scale + ")";
 }
-function weapon_special_add(tad, weapon){
+function weapon_special_add_queue(tad, weapon){
     let parts = [];
     parts[0] = [];
     parts[0][0] = weapon.new_dam;
@@ -528,7 +531,7 @@ function weapon_special_add(tad, weapon){
         data: {
             actionType: weapon.db.ak,
             quantity: 1,
-            price: weapon.value,
+            price: weapon.db.value,
             damage: {
                 parts: parts
             }
@@ -537,7 +540,6 @@ function weapon_special_add(tad, weapon){
         weaponType: weapon.db.weaponType
     });
 }
-
 function npc_equip_armor(tad){
     //We are giving PCs base level armor for free
     let armor = [];
@@ -545,7 +547,20 @@ function npc_equip_armor(tad){
     armor["Light"]  = ["Padded Armor","Leather Armor","Studded Leather Armor"];
     armor["Medium"] = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor"];
     armor["Heavy"]  = ["Padded Armor","Leather Armor","Studded Leather Armor","Hide Armor","Chain Shirt","Scale Mail","Breastplate","Half Plate Armor","Ring Mail","Chain Mail","Splint Armor","Plate Armor"];
-    tad.armor = armor[tad.template.armor].random();
+
+    let armor_count = armor[tad.template.armor].length;
+    let roll = roll_simple(armor_count);
+    roll = roll - 4 + tad.cr_new;
+    if (roll < 0){ roll = 1; }
+    if (roll > armor_count){ roll = armor_count; }
+
+    console.log("armor_count", armor_count);    
+    console.log("roll", roll);
+
+
+    tad.armor = armor[tad.template.armor][roll-1];
+    //tad.armor = armor[tad.template.armor].random();
+    console.log("armor result", tad)
 
     //Buy Armor with starting gold
     if (tad.starting_gold > 24000){
@@ -562,7 +577,29 @@ function npc_equip_armor(tad){
         tad.armor += " +1";
     }
     tad.items_to_add_compendium.push(["dnd5e.items", tad.armor]);
-    if (tad.melee_handed == 1){
+}
+function npc_equip_base_weapons_get(tad){
+    //Get melee weapons
+    if (roll_simple(2) == 1){
+        tad.weapon_1.base = tad.template.weapons_1_handed.random();
+    } else {
+        tad.weapon_1.base = tad.template.weapons_2_handed.random();
+    }
+
+    //Get ranged weapons
+    if (roll_simple(2) == 1){
+        tad.weapon_2.base = tad.template.weapons_1_handed_range.random();
+    } else {
+        tad.weapon_2.base = tad.template.weapons_2_handed_range.random();
+    }
+    tad.weapon_1.db = weapondb_get(tad.weapon_1.base);                          //Lookup base weapon info
+    tad.weapon_2.db = weapondb_get(tad.weapon_2.base);
+
+    console.log("npc_equip_base_weapons_get()", tad);
+}
+
+function npc_equip_shield(tad){
+    if (!tad.weapon_1.db.h){
         tad.shield = "Shield";
         //Buy Armor with starting gold
         if (tad.starting_gold > 24000){
@@ -579,197 +616,30 @@ function npc_equip_armor(tad){
             tad.shield += " +1";
         }
         tad.items_to_add_compendium.push(["dnd5e.items", tad.shield]);
-    }
+    } 
 }
-function npc_equip_weapons_get_base(tad){
-    //Get a melee and a range weapon
 
-    //console.log("tad before weapon choose", tad);
-    
-    //if (tad.creature_type === "giant"){
-    //    npc_equip_giant_weapons_normal(tad);
-    //} else {
-
-        if (roll_simple(2) == 1){
-            tad.melee_handed = 1;
-            tad.weapon_1.base = tad.template.weapons_1_handed.random();
-        } else {
-            tad.melee_handed = 2;
-            tad.weapon_1.base = tad.template.weapons_2_handed.random();
-        }
-        if (roll_simple(2) == 1){
-            tad.weapon_2.base = tad.template.weapons_1_handed_range.random();
-        } else {
-            tad.weapon_2.base = tad.template.weapons_2_handed_range.random();
-        }
-    //}
-}
-function npc_equip_giant_weapons_normal(tad){
-    //Choose weapon types
-    tad.weapon_1_base = ["Giant Axe","Giant Club","Giant Morningstar","Giant Sword"].random();
-    tad.weapon_2_base = ["Giant Crossbow","Giant Longbow"].random();
-
-    //Choose Weapon Scale
-    let str = tad.attributes["str"];
-    switch(true){
-        case str < 11:
-            tad.weapon_1_scale = "xs"
-            tad.weapon_2_scale = "xs"
-            break;
-        case str < 16:
-            tad.weapon_1_scale = "sm"
-            tad.weapon_2_scale = "sm"
-            break;
-        case str < 21:
-            tad.weapon_1_scale = "m"
-            tad.weapon_2_scale = "m"
-            break;
-        case str < 23:
-            tad.weapon_1_scale = "lg"
-            tad.weapon_2_scale = "lg"
-            break;
-        case str < 31:
-            tad.weapon_1_scale = "xl"
-            tad.weapon_2_scale = "xl"
-            break;
-    }
-
-    tad.weapon_1 = tad.weapon_1_base + " (" + tad.weapon_1_scale + ") ";
-    tad.weapon_2 = tad.weapon_2_base + " (" + tad.weapon_2_scale + ") ";
-
-
-    npc_equip_weapons_magic(tad);
-
-    //Build the weapons
-    let weapon = [];
-    let icons = "systems/dnd5e/icons/items/weapons/";
-    weapon["Giant Axe (xs)"] = {type:"giant", min_str:1, dam: "1d12 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greataxe.jpg"};
-    weapon["Giant Axe (sm)"] = {type:"giant", min_str:19, dam: "2d12 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greataxe.jpg"};
-    weapon["Giant Axe (m)"] =  {type:"giant", min_str:21, dam: "3d12 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greataxe.jpg"};
-    weapon["Giant Axe (lg)"] = {type:"giant", min_str:23, dam: "4d12 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greataxe.jpg"};
-    weapon["Giant Axe (xl)"] = {type:"giant", min_str:25, dam: "5d12 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greataxe.jpg"};
-    weapon["Giant Club (xs)"] = {type:"giant", min_str:1, dam: "2d8 +@mod", dam_type:"bludgeoning", weapon_type: "simpleM", img: icons + "greatclub.png"};
-    weapon["Giant Club (sm)"] = {type:"giant", min_str:19, dam: "3d8 +@mod", dam_type:"bludgeoning", weapon_type: "simpleM", img: icons + "greatclub.png"};
-    weapon["Giant Club (m)"] =  {type:"giant", min_str:21, dam: "4d8 +@mod", dam_type:"bludgeoning", weapon_type: "simpleM", img: icons + "greatclub.png"};
-    weapon["Giant Club (lg)"] = {type:"giant", min_str:23, dam: "5d8 +@mod", dam_type:"bludgeoning", weapon_type: "simpleM", img: icons + "greatclub.png"};
-    weapon["Giant Club (xl)"] = {type:"giant", min_str:25, dam: "6d8 +@mod", dam_type:"bludgeoning", weapon_type: "simpleM", img: icons + "greatclub.png"};
-    weapon["Giant Morningstar (xs)"] = {type:"giant", min_str:1, dam: "2d8 +@mod", dam_type:"piering", weapon_type: "martialM", img: icons + "morningstar.jpg"};
-    weapon["Giant Morningstar (sm)"] = {type:"giant", min_str:19, dam: "3d8 +@mod", dam_type:"piering", weapon_type: "martialM", img: icons + "morningstar.jpg"};
-    weapon["Giant Morningstar (m)"] =  {type:"giant", min_str:21, dam: "4d8 +@mod", dam_type:"piering", weapon_type: "martialM", img: icons + "morningstar.jpg"};
-    weapon["Giant Morningstar (lg)"] = {type:"giant", min_str:23, dam: "5d8 +@mod", dam_type:"piering", weapon_type: "martialM", img: icons + "morningstar.jpg"};
-    weapon["Giant Morningstar (xl)"] = {type:"giant", min_str:25, dam: "6d8 +@mod", dam_type:"piering", weapon_type: "martialM", img: icons + "morningstar.jpg"};
-    weapon["Giant Sword (xs)"] = {type:"giant", min_str:1, dam: "2d6 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greatsword.png"};
-    weapon["Giant Sword (sm)"] = {type:"giant", min_str:19, dam: "3d6 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greatsword.png"};
-    weapon["Giant Sword (m)"] =  {type:"giant", min_str:21, dam: "4d6 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greatsword.png"};
-    weapon["Giant Sword (lg)"] = {type:"giant", min_str:23, dam: "5d6 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greatsword.png"};
-    weapon["Giant Sword (xl)"] = {type:"giant", min_str:25, dam: "6d6 +@mod", dam_type:"slashing", weapon_type: "martialM", img: icons + "greatsword.png"};
-
-    console.log(tad);
-    console.log("Building Giant Weapon 1: " + tad.weapon_1);
-    console.log("Building Giant Weapon 2: " + tad.weapon_2);
-
-    let img = "";
-    let key = tad.weapon_1_base + " (" + tad.weapon_1_scale + ")";
-    let parts = [];
-    parts[0] = [];
-    parts[0][0] = weapon[key].dam;
-    parts[0][1] = weapon[key].dam_type;
-
-    tad.items_to_add_raw.push({
-        name: tad.weapon_1,
-        type: "weapon",
-        data: {
-            actionType: "mwak",
-            quantity: 1,
-            price: tad.weapon_1_value,
-            damage: {
-                parts: parts
-            }
-
-        },
-        img: weapon[key].img,
-        weaponType: weapon[key].weapon_type
-    });
-
-    
-    
-
-    weapon = [];
-    weapon["Giant Crossbow (xs)"] = {type:"giant", min_str:1, dam: "1d10 +@mod", dam_type:"piering", img: icons + "crossbow-heavy.jpg"};
-    weapon["Giant Crossbow (sm)"] = {type:"giant", min_str:19, dam: "2d10 +@mod", dam_type:"piering", img: icons + "crossbow-heavy.jpg"};
-    weapon["Giant Crossbow (m)"] =  {type:"giant", min_str:21, dam: "3d10 +@mod", dam_type:"piering", img: icons + "crossbow-heavy.jpg"};
-    weapon["Giant Crossbow (lg)"] = {type:"giant", min_str:23, dam: "4d10 +@mod", dam_type:"piering", img: icons + "crossbow-heavy.jpg"};
-    weapon["Giant Crossbow (xl)"] = {type:"giant", min_str:25, dam: "5d10 +@mod", dam_type:"piering", img: icons + "crossbow-heavy.jpg"};
-    weapon["Giant Longbow (xs)"] = {type:"giant", min_str:1, dam: "2d8 +@mod", dam_type:"piering", img: icons + "bow-long.jpg"};
-    weapon["Giant Longbow (sm)"] = {type:"giant", min_str:19, dam: "3d8 +@mod", dam_type:"piering", img: icons + "bow-long.jpg"};
-    weapon["Giant Longbow (m)"] =  {type:"giant", min_str:21, dam: "4d8 +@mod", dam_type:"piering", img: icons + "bow-long.jpg"};
-    weapon["Giant Longbow (lg)"] = {type:"giant", min_str:23, dam: "5d8 +@mod", dam_type:"piering", img: icons + "bow-long.jpg"};
-    weapon["Giant Longbow (xl)"] = {type:"giant", min_str:25, dam: "6d8 +@mod", dam_type:"piering", img: icons + "bow-long.jpg"};
-
-    img = "";
-    key = tad.weapon_2_base + " (" + tad.weapon_2_scale + ")";
-    parts[0][0] = weapon[key].dam;
-    parts[0][1] = weapon[key].dam_type;
-
-    tad.items_to_add_raw.push({
-        name: tad.weapon_2,
-        type: "weapon",
-        data: {
-            actionType: "rwak",
-            quantity: 1,
-            price: tad.weapon_2_value,
-        },
-        img: weapon[key].img,
-        weaponType: "martialRanged"
-    });
-
-}
-function npc_equip_weapons_add_magic(tad){
+function npc_equip_weapons_add_magic(starting_gold, weapon){
     //Buy Weapon with starting gold
-    if (tad.starting_gold > 16000){
-        tad.starting_gold -= 16000;
-        if (roll_simple(2) == 1){
-            tad.weapon_1.name = tad.weapon_1.base += " +3";
-            tad.weapon_1.plus = 3;
-            tad.weapon_1.value = 16000;
-        } else {
-            tad.weapon_2 += " +3";
-            tad.weapon_2.plus = 3;
-            tad.weapon_2.value = 16000;
-        }
-        //+3 weapon
-    } else if (tad.starting_gold > 4000){
-        //+2 Weapon
-        tad.starting_gold -= 4000;
-        if (roll_simple(2) == 1){
-            tad.weapon_1.name = tad.weapon_1.base += " +2";
-            tad.weapon_1.plus = 2;
-            tad.weapon_1.value = 4000;
-        } else {
-            tad.weapon_2 += " +2";
-            tad.weapon_2.plus = 2;
-            tad.weapon_2.value = 4000;
-        }
-    } else if (tad.starting_gold > 1000){
-        //+1 Weapon
-        tad.starting_gold -= 1000;
-        if (roll_simple(2) == 1){
-            tad.weapon_1.name = tad.weapon_1.base += " +1";
-            tad.weapon_1.plus = 1;
-            tad.weapon_1.value = 1000;
-        } else {
-            tad.weapon_2 += " +1";
-            tad.weapon_2.plus = 1;
-            tad.weapon_2.value = 1000;
-        }
+    if (starting_gold > 16000){
+        starting_gold -= 16000;
+        weapon.name = weapon.base + " +3";
+        weapon.plus = 3;
+    } else if (starting_gold > 4000){
+        starting_gold -= 4000;
+        weapon.name = weapon.base + " +2";
+        weapon.plus = 2;
+    } else if (starting_gold > 1000){
+        starting_gold -= 1000;
+        weapon.name = weapon.base + " +1";
+        weapon.plus = 1;
     } else {
-        tad.weapon_1.name = tad.weapon_1.base;
-        tad.weapon_1.plus = 0;
-        tad.weapon_1.value = roll_simple(50);
-        tad.weapon_2.name = tad.weapon_2.base
-        tad.weapon_2.plus = 0;
-        tad.weapon_2.roll_simple(50);
+        weapon.name = weapon.base;
+        weapon.plus = 0;
+        console.log("No gold for weapon", weapon)
     }
+
+    console.log("npc_equip_weapons_add_magic()", weapon);
 }
 function npc_equip_misc_magic(tad){
     //Scramble misc_items
@@ -1180,41 +1050,41 @@ function weapondb_get(base){
     //Weapon Database - For creating weapons on-the-fly
     let icons = "systems/dnd5e/icons/items/weapons/";
     let weapon = [];
-    weapon["Battleaxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d8 + @mod",dam_type:"slashing",heavy:false,price:10,range:5,range_long:null,reach:false,type:"martialM",weight:4};
-    weapon["Blowgun"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1 + @mod",dam_type:"piercing",heavy:false,price:10,range:25,range_long:100,reach:false,type:"martialR",weight:1};
-    weapon["Club"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:0.1,range:5,range_long:null,reach:false,type:"simpleM",weight:2};
-    weapon["Dagger"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d4 + @mod",dam_type:"piercing",heavy:false,price:2,range:20,range_long:60,reach:false,type:"simpleM",weight:1};
-    weapon["Dart"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1d4 + @mod",dam_type:"piercing",heavy:false,price:0.05,range:20,range_long:60,reach:false,type:"simpleR",weight:0.25};
-    weapon["Flail"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d8+@mod",dam_type:"bludgeoning",heavy:false,price:10,range:5,range_long:0,reach:false,type:"martialM",weight:2};
-    weapon["Glaive"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"1d10 + @mod",dam_type:"slashing",heavy:true,price:20,range:10,range_long:null,reach:true,type:"martialM",weight:6};
-    weapon["Greataxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"1d12 + @mod",dam_type:"slashing",heavy:true,price:30,range:5,range_long:null,reach:false,type:"martialM",weight:7};
-    weapon["Greatclub"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"1d8 + @mod",dam_type:"bludgeoning",heavy:false,price:0.2,range:5,range_long:0,reach:false,type:"simpleM",weight:10};
-    weapon["Greatsword"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"2d6 + @mod",dam_type:"slashing",heavy:true,price:50,range:5,range_long:null,reach:false,type:"martialM",weight:6};
-    weapon["Halberd"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"1d10 + @mod",dam_type:"slashing",heavy:true,price:20,range:10,range_long:null,reach:true,type:"martialM",weight:6};
-    weapon["Hand Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:75,range:30,range_long:120,reach:false,type:"martialR",weight:3};
-    weapon["Handaxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d6 + @mod",dam_type:"slashing",heavy:false,price:5,range:20,range_long:60,reach:false,type:"simpleM",weight:2};
-    weapon["Heavy Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:true,dam:"1d10 + @mod",dam_type:"piercing",heavy:true,price:50,range:100,range_long:400,reach:false,type:"martialR",weight:18};
-    weapon["Javelin"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:0.5,range:30,range_long:120,reach:false,type:"simpleM",weight:2};
-    weapon["Lance"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d12 + @mod",dam_type:"piercing",heavy:false,price:10,range:10,range_long:null,reach:true,type:"martialM",weight:6};
-    weapon["Light Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:true,dam:"1d8 + @mod",dam_type:"piercing",heavy:false,price:25,range:80,range_long:320,reach:false,type:"simpleR",weight:5};
-    weapon["Light Hammer"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:2,range:20,range_long:60,reach:false,type:"simpleM",weight:2};
-    weapon["Longbow"]={img: icons + "bow-long.jpg",ak:"rwak",2h:true,dam:"1d8 + @mod",dam_type:"piercing",heavy:true,price:50,range:150,range_long:600,reach:false,type:"martialR",weight:2};
-    weapon["Longsword"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:undefined,dam:"1d8 + @mod",dam_type:"slashing",heavy:undefined,price:15,range:5,range_long:null,reach:undefined,type:"martialM",weight:3};
-    weapon["Mace"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d6 + @mod",dam_type:"bludgeoning",heavy:false,price:5,range:5,range_long:0,reach:false,type:"simpleM",weight:4};
-    weapon["Maul"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"2d6 + @mod",dam_type:"bludgeoning",heavy:true,price:10,range:5,range_long:null,reach:undefined,type:"martialM",weight:10};
-    weapon["Morningstar"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d8+@mod",dam_type:"piercing",heavy:false,price:15,range:5,range_long:0,reach:false,type:"martialM",weight:4};
-    weapon["Pike"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:true,dam:"1d10 + @mod",dam_type:"piercing",heavy:true,price:5,range:10,range_long:null,reach:true,type:"martialM",weight:18};
-    weapon["Quarterstaff"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d6 + @mod",dam_type:"bludgeoning",heavy:false,price:0.2,range:5,range_long:null,reach:false,type:"simpleM",weight:4};
-    weapon["Rapier"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:undefined,dam:"1d8 + @mod",dam_type:"piercing",heavy:undefined,price:25,range:5,range_long:null,reach:undefined,type:"martialM",weight:2};
-    weapon["Scimitar"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:undefined,dam:"1d6 + @mod",dam_type:"slashing",heavy:undefined,price:25,range:5,range_long:null,reach:undefined,type:"martialM",weight:3};
-    weapon["Shortbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:true,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:25,range:80,range_long:320,reach:false,type:"simpleR",weight:2};
-    weapon["Sickle"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d4 + @mod",dam_type:"slashing",heavy:false,price:1,range:5,range_long:null,reach:false,type:"simpleM",weight:2};
-    weapon["Sling"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:0.1,range:30,range_long:120,reach:false,type:"simpleR",weight:0};
-    weapon["Spear"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:1,range:20,range_long:60,reach:false,type:"simpleM",weight:3};
-    weapon["Trident"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:5,range:20,range_long:60,reach:false,type:"martialM",weight:4};
-    weapon["War Pick"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d8 + @mod",dam_type:"piercing",heavy:false,price:5,range:5,range_long:null,reach:false,type:"martialM",weight:2};
-    weapon["Warhammer"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",2h:false,dam:"1d8 + @mod",dam_type:"bludgeoning",heavy:false,price:15,range:5,range_long:null,reach:false,type:"martialM",weight:2};
-    weapon["Whip"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",2h:false,dam:"1d4 + @mod",dam_type:"slashing",heavy:false,price:2,range:10,range_long:null,reach:true,type:"martialM",weight:3};
+    weapon["Battleaxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d8 + @mod",dam_type:"slashing",heavy:false,price:10,range:5,range_long:null,reach:false,type:"martialM",weight:4};
+    weapon["Blowgun"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1 + @mod",dam_type:"piercing",heavy:false,price:10,range:25,range_long:100,reach:false,type:"martialR",weight:1};
+    weapon["Club"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:0.1,range:5,range_long:null,reach:false,type:"simpleM",weight:2};
+    weapon["Dagger"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d4 + @mod",dam_type:"piercing",heavy:false,price:2,range:20,range_long:60,reach:false,type:"simpleM",weight:1};
+    weapon["Dart"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1d4 + @mod",dam_type:"piercing",heavy:false,price:0.05,range:20,range_long:60,reach:false,type:"simpleR",weight:0.25};
+    weapon["Flail"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d8+@mod",dam_type:"bludgeoning",heavy:false,price:10,range:5,range_long:0,reach:false,type:"martialM",weight:2};
+    weapon["Glaive"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"1d10 + @mod",dam_type:"slashing",heavy:true,price:20,range:10,range_long:null,reach:true,type:"martialM",weight:6};
+    weapon["Greataxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"1d12 + @mod",dam_type:"slashing",heavy:true,price:30,range:5,range_long:null,reach:false,type:"martialM",weight:7};
+    weapon["Greatclub"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"1d8 + @mod",dam_type:"bludgeoning",heavy:false,price:0.2,range:5,range_long:0,reach:false,type:"simpleM",weight:10};
+    weapon["Greatsword"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"2d6 + @mod",dam_type:"slashing",heavy:true,price:50,range:5,range_long:null,reach:false,type:"martialM",weight:6};
+    weapon["Halberd"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"1d10 + @mod",dam_type:"slashing",heavy:true,price:20,range:10,range_long:null,reach:true,type:"martialM",weight:6};
+    weapon["Hand Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:75,range:30,range_long:120,reach:false,type:"martialR",weight:3};
+    weapon["Handaxe"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d6 + @mod",dam_type:"slashing",heavy:false,price:5,range:20,range_long:60,reach:false,type:"simpleM",weight:2};
+    weapon["Heavy Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:true,dam:"1d10 + @mod",dam_type:"piercing",heavy:true,price:50,range:100,range_long:400,reach:false,type:"martialR",weight:18};
+    weapon["Javelin"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:0.5,range:30,range_long:120,reach:false,type:"simpleM",weight:2};
+    weapon["Lance"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d12 + @mod",dam_type:"piercing",heavy:false,price:10,range:10,range_long:null,reach:true,type:"martialM",weight:6};
+    weapon["Light Crossbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:true,dam:"1d8 + @mod",dam_type:"piercing",heavy:false,price:25,range:80,range_long:320,reach:false,type:"simpleR",weight:5};
+    weapon["Light Hammer"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:2,range:20,range_long:60,reach:false,type:"simpleM",weight:2};
+    weapon["Longbow"]={img: icons + "bow-long.jpg",ak:"rwak",h:true,dam:"1d8 + @mod",dam_type:"piercing",heavy:true,price:50,range:150,range_long:600,reach:false,type:"martialR",weight:2};
+    weapon["Longsword"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:undefined,dam:"1d8 + @mod",dam_type:"slashing",heavy:undefined,price:15,range:5,range_long:null,reach:undefined,type:"martialM",weight:3};
+    weapon["Mace"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d6 + @mod",dam_type:"bludgeoning",heavy:false,price:5,range:5,range_long:0,reach:false,type:"simpleM",weight:4};
+    weapon["Maul"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"2d6 + @mod",dam_type:"bludgeoning",heavy:true,price:10,range:5,range_long:null,reach:undefined,type:"martialM",weight:10};
+    weapon["Morningstar"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d8+@mod",dam_type:"piercing",heavy:false,price:15,range:5,range_long:0,reach:false,type:"martialM",weight:4};
+    weapon["Pike"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:true,dam:"1d10 + @mod",dam_type:"piercing",heavy:true,price:5,range:10,range_long:null,reach:true,type:"martialM",weight:18};
+    weapon["Quarterstaff"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d6 + @mod",dam_type:"bludgeoning",heavy:false,price:0.2,range:5,range_long:null,reach:false,type:"simpleM",weight:4};
+    weapon["Rapier"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:undefined,dam:"1d8 + @mod",dam_type:"piercing",heavy:undefined,price:25,range:5,range_long:null,reach:undefined,type:"martialM",weight:2};
+    weapon["Scimitar"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:undefined,dam:"1d6 + @mod",dam_type:"slashing",heavy:undefined,price:25,range:5,range_long:null,reach:undefined,type:"martialM",weight:3};
+    weapon["Shortbow"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:true,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:25,range:80,range_long:320,reach:false,type:"simpleR",weight:2};
+    weapon["Sickle"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d4 + @mod",dam_type:"slashing",heavy:false,price:1,range:5,range_long:null,reach:false,type:"simpleM",weight:2};
+    weapon["Sling"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1d4 + @mod",dam_type:"bludgeoning",heavy:false,price:0.1,range:30,range_long:120,reach:false,type:"simpleR",weight:0};
+    weapon["Spear"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:1,range:20,range_long:60,reach:false,type:"simpleM",weight:3};
+    weapon["Trident"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d6 + @mod",dam_type:"piercing",heavy:false,price:5,range:20,range_long:60,reach:false,type:"martialM",weight:4};
+    weapon["War Pick"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d8 + @mod",dam_type:"piercing",heavy:false,price:5,range:5,range_long:null,reach:false,type:"martialM",weight:2};
+    weapon["Warhammer"]={img: icons + "crossbow-heavy.jpg",ak:"mwak",h:false,dam:"1d8 + @mod",dam_type:"bludgeoning",heavy:false,price:15,range:5,range_long:null,reach:false,type:"martialM",weight:2};
+    weapon["Whip"]={img: icons + "crossbow-heavy.jpg",ak:"rwak",h:false,dam:"1d4 + @mod",dam_type:"slashing",heavy:false,price:2,range:10,range_long:null,reach:true,type:"martialM",weight:3};
     return weapon[base];
 }
 
