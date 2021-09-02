@@ -478,14 +478,16 @@ function npc_equip(tad){
             break;
         case "Cleric":
             npc_equip_base_weapons_get(tad);
-            npc_equip_weapons_add_magic(tad);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_1);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_2);
             npc_equip_armor(tad);
             npc_equip_shield(tad);
             break;
         case "Wizard":
             npc_equip_base_weapons_get(tad);
             npc_equip_misc_magic(tad);
-            npc_equip_weapons_add_magic(tad);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_1);
+            npc_equip_weapons_add_magic(tad.starting_gold, tad.weapon_2);
     }
 
     //Equip NPC Weapons
@@ -495,8 +497,8 @@ function npc_equip(tad){
         weapon_special_add_queue(tad, tad.weapon_1);                            //Add weapons to queue
         weapon_special_add_queue(tad, tad.weapon_2);
     } else {
-        tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_1]);        //Add standard weapons from SRD Items
-        tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_2]);
+        tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_1.base]);        //Add standard weapons from SRD Items
+        tad.items_to_add_compendium.push(["dnd5e.items", tad.weapon_2.base]);
     }
 
     //Loot
