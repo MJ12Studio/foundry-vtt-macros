@@ -21,7 +21,6 @@
        * Choose items to sell (checklist)
 
 */
-
 console.clear();
 dialog_main();
    
