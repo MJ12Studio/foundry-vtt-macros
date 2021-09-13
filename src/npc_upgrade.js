@@ -599,7 +599,6 @@ function npc_equip_base_weapons_get(tad){
 
     console.log("npc_equip_base_weapons_get()", tad);
 }
-
 function npc_equip_shield(tad){
     if (!tad.weapon_1.db.h){
         tad.shield = "Shield";
@@ -620,7 +619,6 @@ function npc_equip_shield(tad){
         tad.items_to_add_compendium.push(["dnd5e.items", tad.shield]);
     } 
 }
-
 function npc_equip_weapons_add_magic(starting_gold, weapon){
     //Buy Weapon with starting gold
     if (starting_gold > 16000){

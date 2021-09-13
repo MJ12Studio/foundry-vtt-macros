@@ -22,7 +22,7 @@
 
 */
 console.clear();
-dialog_main();
+main();
    
 async function chest_clear(){
     let chest = token("Group Treasure Chest");
@@ -184,7 +184,26 @@ async function npc_loot(opt){
     inventory_stack();
 }
 
-function dialog_main(){
+function roll_lo_hi(lo, hi){
+    return roll_simple(hi - lo + 1) + lo - 1;
+}
+function roll_simple(d){
+    return Math.floor(Math.random() * d) + 1
+}
+
+async function main(){
+    //Find out if settings for looter are registered
+    let settings = await game.settings.get("MJMacros", "looter_settings");
+    if (!settings){
+        await game.settings.register("MJMacros", "looter_settings", {
+            scope: "world",
+            config: false,
+            default: {sell_percent:100, buy_percent:100},
+            type: Object
+        });
+        settings = await game.settings.get("MJMacros", "looter_settings");
+    }
+
     let opt = [];
     let d = new Dialog({
         title: "Looter",
@@ -227,16 +246,7 @@ function dialog_main(){
                 },
                 width: 50
             },
-            three: {
-                label: "Clear out Chest",
-                callback: () => {
-                    d.render(true);
-                    if (window.confirm("Do you really want to clear out chest?")) {
-                        chest_clear();
-                    }
-                }
-            },
-            four: {
+            two: {
                 label: "Sell",
                 callback: () => {
                     d.render(true);
@@ -245,9 +255,32 @@ function dialog_main(){
                         console.log("Sell Percent: " + value);
                     //}
                 }
+            },
+            three: {
+                label: "Roll %",
+                callback: () => {
+                    d.render(true);
+                    settings.buy_percent = roll_lo_hi(90,150);
+                    settings.sell_percent = roll_lo_hi(50,110);
+                    await settings_update(settings);
+                }
+            },
+            four: {
+                label: "Empty Chest",
+                callback: () => {
+                    d.render(true);
+                    if (window.confirm("Do you really want to clear out chest?")) {
+                        chest_clear();
+                    }
+                }
             }
         }
     });
+
+async function settings_update(settings){
+    await game.settings.set("MJMacros", "looter_settings", settings);
+}
+
 
     /*
             two: {
